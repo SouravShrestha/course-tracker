@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.library-explorer{
+  overflow-y: scroll; 
+}
+
+::-webkit-scrollbar-track
+{
+	border-radius: 10px;
+	background-color: #010409;
+}
+
+::-webkit-scrollbar
+{
+	width: .375rem;
+	border-radius: 10px;
+	background-color: #30363db3;
+}
+
+::-webkit-scrollbar-thumb
+{
+	border-radius: 10px;
+	background-color: #30363db3;
+}
+
+.loading-bar {
+  width: 20%;
+}
+  
+.gradient-loader {
+  @apply bg-gradient-to-r from-accent via-purple-500 to-pink-500;
+  background-size: 200% 200%;
+  animation: gradiant-move 2s infinite;
+}
+@keyframes gradiant-move { 
+  0%{background-position:left; width: 0%;}
+  50%{background-position:left; width: 50%;}
+  100%{background-position:left; width: 100%;}
+}
+
+.transition-bg {
+  transition: background-color 0.2s ease-in-out; /* Adjust the duration and easing function as needed */
+}
