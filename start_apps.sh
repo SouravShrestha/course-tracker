@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Navigate to the video progress backend directory and start the FastAPI app
-(cd video-progress-backend && uvicorn app.main:app --host 0.0.0.0 --port 8000) &
+(cd video-progress-backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload) &
 
 # Wait for the backend to start
 sleep 10

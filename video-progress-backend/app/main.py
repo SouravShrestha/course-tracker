@@ -1,3 +1,4 @@
+import glob
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,8 +75,8 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
                 if not video_obj:
                     # Calculate video duration using moviepy
                     try:
-                        clip = VideoFileClip(video['path'])
-                        duration_in_seconds = clip.duration
+                        with VideoFileClip(video['path']) as clip:
+                            duration_in_seconds = clip.duration
                         formatted_duration = convert_seconds_to_hhmmss(duration_in_seconds)
                     except Exception as e:
                         print(f"Error loading video duration for {video['path']}: {e}")
@@ -85,7 +86,46 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
                     db.add(video_obj)
 
     db.commit()
+    clean_up_db(session=db)
     return {"message": "Folder structure scanned and data inserted successfully."}
+
+def clean_up_db(session: Session):
+    # Step 1: Retrieve all main folders, subfolders, and videos from the DB
+    main_folders = session.query(MainFolder).all()
+
+    for main_folder in main_folders:
+        # Step 2: Check if the main folder exists on the filesystem
+        if not os.path.exists(main_folder.path):
+            print(f"Main folder '{main_folder.name}' not found on disk. Removing from DB.")
+            session.delete(main_folder)
+            continue
+
+        for folder in main_folder.folders:
+            folder_path = os.path.join(main_folder.path, folder.name)
+
+            # Step 3: Check if the folder exists
+            if not os.path.exists(folder_path):
+                print(f"Folder '{folder.name}' in '{main_folder.name}' not found on disk. Removing from DB.")
+                session.delete(folder)
+                continue
+
+            for subfolder in folder.subfolders:
+                subfolder_path = os.path.join(folder_path, subfolder.name)
+
+                # Step 4: Check if the subfolder exists
+                if not os.path.exists(subfolder_path):
+                    print(f"Subfolder '{subfolder.name}' in '{folder.name}' not found on disk. Removing from DB.")
+                    session.delete(subfolder)
+                    continue
+
+                for video in subfolder.videos:
+                    # Step 5: Check if the video exists
+                    if not os.path.exists(video.path):
+                        print(f"Video '{video.name}' in '{subfolder.name}' not found on disk. Removing from DB.")
+                        session.delete(video)
+
+    # Commit the changes after the cleanup
+    session.commit()
 
 @app.put("/api/update-video/{video_id}")
 def update_video(video_id: int, request: UpdateVideoRequest, db: Session = Depends(get_db)):
@@ -121,9 +161,19 @@ def get_folders(db: Session = Depends(get_db)):
         for folder in folders
     ]
 
+def contains_videos(folder_path):
+    video_extensions = ('*.mp4', '*.mkv', '*.avi')  # Add other video extensions if needed
+    
+    # Check if any video files exist in the folder_path or its subfolders
+    for extension in video_extensions:
+        if glob.glob(os.path.join(folder_path, '**', extension), recursive=True):
+            return True
+    
+    return False
+
 @app.get("/api/folder-exists/")
 def folder_exists(folder_path: str):
-    if os.path.exists(folder_path):
+    if os.path.exists(folder_path) and contains_videos(folder_path):
         return {"exists": True}
     else:
         raise HTTPException(status_code=404, detail="Folder does not exist.")

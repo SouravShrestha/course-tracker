@@ -49,7 +49,7 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
 
   return (
     <>
-      {contents.map((content) => (
+      {contents.filter((content) => content.videos.length > 0).map((content) => (
         <div className="py-4" key={content.id}>
           <div className="text-base font-semibold cursor-default">
             {content.name.replace(/^\d+\.\s*/, "").toUpperCase()}
@@ -111,11 +111,11 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
                           />
                         </div>
                       ))}
-                    <div className="w-4/5 max-w-4/5">
+                    <div className="w-full max-w-full">
                       {video.name.replace(/\.\w+$/, "")}
                     </div>
                   </div>
-                  <div className="w-1/4 flex justify-end">
+                  <div className="w-auto flex justify-end">
                     {video.path != activeVideoPath ? (
                       <span
                         className={`text-sm hover:no-underline transition duration-200`}

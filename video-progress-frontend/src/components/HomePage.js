@@ -2,12 +2,14 @@ import React, { useEffect, useState } from "react";
 import CourseCard from "./CourseCard";
 import Popup from "./Popup";
 import downArrowImg from "../assets/images/down-arrow.png";
+import loadingGif from "../assets/images/loading.gif";
 
 const HomePage = () => {
   const [courses, setCourses] = useState([]);
   const [, setFolders] = useState([]);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [validPaths, setValidPaths] = useState({}); 
+  const [validPaths, setValidPaths] = useState({});
+  const [loading, setLoading] = useState(false);
 
   // Fetch stored folders from local storage
   const fetchStoredFolders = () => {
@@ -32,20 +34,37 @@ const HomePage = () => {
   };
 
   const scanFolders = async () => {
-    const storedFolders = JSON.parse(localStorage.getItem("folders"));
+    const storedFolders = JSON.parse(localStorage.getItem("folders")) || [];
+    if (storedFolders.length > 0){
+      setLoading(true);
+    }
     for (const folder of storedFolders) {
-      const scanResponse = await fetch(
-        "http://localhost:8000/api/scan-folder",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ main_folder_path: folder }), // Use each folder from local storage
+      try {
+        const scanResponse = await fetch(
+          "http://localhost:8000/api/scan-folder",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ main_folder_path: folder }),
+          }
+        );
+
+        if (!scanResponse.ok) {
+          console.error(
+            `Failed to scan folder: ${folder}`,
+            await scanResponse.text()
+          );
+          continue; // Skip to the next folder
         }
-      );
-      if (!scanResponse.ok) console.error(`Failed to scan folder: ${folder}`);
-      fetchCourses(storedFolders);
+
+        // Fetch courses after scanning each folder
+        await fetchCourses(storedFolders);
+        setLoading(false);
+      } catch (error) {
+        console.error(`Error scanning folder ${folder}:`, error);
+      }
     }
   };
 
@@ -131,6 +150,12 @@ const HomePage = () => {
         <p className="mt-5 text-sm text-colortextsecondary">
           🥺 No courses available. Try adding a new folder.
         </p>
+      )}
+      {loading && (
+        <div className="fixed bottom-6 right-6 z-30 py-1.5 px-3 bg-primarydark text-white rounded-lg shadow-md border border-colorborder flex items-center space-x-2">
+          <img src={loadingGif} alt="Loading..." className="w-6 h-6" />
+          <span className="text-sm">Scanning folders for changes</span>
+        </div>
       )}
     </div>
   );

@@ -11,7 +11,7 @@ class MainFolder(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     path = Column(String, unique=True)
-    folders = relationship("Folder", back_populates="main_folder")
+    folders = relationship("Folder", back_populates="main_folder", cascade="all, delete-orphan")
 
 class Folder(Base):
     __tablename__ = "folders"
@@ -19,7 +19,7 @@ class Folder(Base):
     name = Column(String)
     main_folder_id = Column(Integer, ForeignKey("main_folders.id"))
     main_folder = relationship("MainFolder", back_populates="folders")
-    subfolders = relationship("Subfolder", back_populates="folder")
+    subfolders = relationship("Subfolder", back_populates="folder", cascade="all, delete-orphan")
     __table_args__ = (UniqueConstraint('main_folder_id', 'name', name='uq_main_folder_name'),)
 
 class Subfolder(Base):
@@ -28,7 +28,7 @@ class Subfolder(Base):
     name = Column(String)
     folder_id = Column(Integer, ForeignKey("folders.id"))
     folder = relationship("Folder", back_populates="subfolders")
-    videos = relationship("Video", back_populates="subfolder")
+    videos = relationship("Video", back_populates="subfolder", cascade="all, delete-orphan")
     __table_args__ = (UniqueConstraint('folder_id', 'name', name='uq_main_folder_name'),)
 
 class Video(Base):
