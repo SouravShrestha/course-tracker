@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { checkFolderExists } from "../utils/api";
 
 const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
   const [folderPath, setFolderPath] = useState("");
@@ -15,54 +16,44 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
   useEffect(() => {
     if (isOpen) {
       updateStoredFolders();
-      inputRef.current?.focus(); // Focus on input box when popup opens
+      inputRef.current?.focus();
       setFolderPath("");
     }
+  }, [isOpen]);
 
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
-    };
+  const handleKeyDown = useCallback((event) => {
+    if (event.key === "Escape") onClose();
+  }, [onClose]);
 
+  useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  const checkFolderExists = async (path) => {
-    try {
-      const response = await fetch(
-        `http://localhost:8000/api/folder-exists/?folder_path=${encodeURIComponent(
-          path
-        )}`
-      );
-      if (!response.ok)
-        throw new Error("🚫 Invalid path entered. Enter the full folder path.");
-      return true;
-    } catch (error) {
-      setMessage("");
-      setErrorMessage(error.message);
-      return false;
-    }
-  };
+  }, [handleKeyDown]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!folderPath.trim()) return;
-    const exists = await checkFolderExists(folderPath);
-    if (exists) {
-      const storedFolders = JSON.parse(localStorage.getItem("folders")) || [];
-      if (!storedFolders.includes(folderPath)) {
-        storedFolders.push(folderPath);
-        localStorage.setItem("folders", JSON.stringify(storedFolders));
-        setFolders(storedFolders);
-        setErrorMessage("");
-        setMessage("🎉 Folder added successfully!");
-        onFoldersUpdate();
-      } else {
-        setMessage("");
-        setErrorMessage("🚨 This folder is already in the list.");
+    try {
+      const exists = await checkFolderExists(folderPath);
+      if (exists) {
+        const storedFolders = JSON.parse(localStorage.getItem("folders")) || [];
+        if (!storedFolders.includes(folderPath)) {
+          storedFolders.push(folderPath);
+          localStorage.setItem("folders", JSON.stringify(storedFolders));
+          setFolders(storedFolders);
+          setErrorMessage("");
+          setMessage("🎉 Folder added successfully!");
+          onFoldersUpdate();
+        } else {
+          setMessage("");
+          setErrorMessage("🚨 This folder is already in the list.");
+        }
       }
-      setFolderPath("");
+    } catch (error) {
+      setMessage("");
+      setErrorMessage(error.message);
     }
+    setFolderPath("");
   };
 
   const handleRemoveFolder = (folder) => {

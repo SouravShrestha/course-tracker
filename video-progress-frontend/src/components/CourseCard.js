@@ -1,80 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import folderImg from "../assets/images/folder.png";
 import checkIcon from "../assets/images/check.png";
 import newIcon from "../assets/images/new.png";
 import progressIcon from "../assets/images/progress.png";
-import axios from "axios";
+import calculateVideoStats from "../utils/courseUtils";
 
 const CourseCard = ({ course }) => {
-  // State to hold the folder data
-  const [folderData, setFolderData] = useState(null);
-
   const navigate = useNavigate();
+
   const handleClick = () => {
     navigate(`/folder/${course.id}`);
   };
 
-  // Function to fetch folder data
-  const fetchFolderData = async () => {
-    try {
-      const response = await axios.get(
-        `http://localhost:8000/api/folders/${course.id}/subfolders`
-      );
-      setFolderData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch folder data:", error);
-    } finally {
-      
-    }
-  };
-
-  useEffect(() => {
-    fetchFolderData();
-  }, [course.id]); // Fetch data when the component mounts or course.id changes
-
-  const convertDurationToSeconds = (duration) => {
-    const [minutes, seconds] = duration.split(":").map(Number);
-    return minutes * 60 + seconds;
-  };
-
-  // Calculate the number of videos and progress based on the fetched data
-  const numberOfVideos = folderData
-    ? folderData.reduce(
-        (total, folder) => total + (folder.videos ? folder.videos.length : 0),
-        0
-      )
-    : 0;
-
-  const completedVideos = folderData
-    ? folderData.reduce(
-        (total, folder) =>
-          total +
-          (folder.videos
-            ? folder.videos.filter(
-                (video) =>
-                  video.progress >= convertDurationToSeconds(video.duration)
-              ).length
-            : 0),
-        0
-      )
-    : 0;
-
-  const startedVideosCount = folderData
-    ? folderData.reduce(
-        (total, folder) =>
-          total +
-          (folder.videos
-            ? folder.videos.filter((video) => video.progress > 0).length
-            : 0),
-        0
-      )
-    : 0;
-
-  const completionPercentage =
-    numberOfVideos > 0
-      ? Math.floor((completedVideos / numberOfVideos) * 100)
-      : 0;
+  const { numberOfVideos, startedVideosCount, completionPercentage } = calculateVideoStats(course);
 
   return (
     <div

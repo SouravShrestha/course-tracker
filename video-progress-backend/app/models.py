@@ -29,7 +29,7 @@ class Subfolder(Base):
     folder_id = Column(Integer, ForeignKey("folders.id"))
     folder = relationship("Folder", back_populates="subfolders")
     videos = relationship("Video", back_populates="subfolder", cascade="all, delete-orphan")
-    __table_args__ = (UniqueConstraint('folder_id', 'name', name='uq_main_folder_name'),)
+    __table_args__ = (UniqueConstraint('folder_id', 'name', name='uq_subfolder_name'),)
 
 class Video(Base):
     __tablename__ = "videos"
@@ -48,21 +48,24 @@ def current_time_ist():
 class Note(Base):
     __tablename__ = "notes"
     id = Column(Integer, primary_key=True, index=True)
-    video_id = Column(Integer, ForeignKey("videos.id"), nullable=False)  # Foreign key to the videos table
-    content = Column(String, nullable=False)  # Note content, cannot be empty
-    created_at = Column(DateTime, default=current_time_ist)  # Automatically set the current timestamp
-    updated_at = Column(DateTime, default=current_time_ist, onupdate=current_time_ist)  # Automatically update on modification
+    video_id = Column(Integer, ForeignKey("videos.id"), nullable=False)
+    content = Column(String, nullable=False)
+    created_at = Column(DateTime, default=current_time_ist)
+    updated_at = Column(DateTime, default=current_time_ist, onupdate=current_time_ist)
 
     video = relationship("Video", back_populates="notes")
 
+class FolderScanRequest(BaseModel):
+    main_folder_path: str
+
 class UpdateVideoRequest(BaseModel):
-    progress: Optional[int] = Field(None, ge=0)  # Progress between 0 and 100
-    notes: Optional[str] = None  # Notes can be optional
+    progress: Optional[int] = Field(None, ge=0)
+    notes: Optional[str] = None
 
 class FolderResponse(BaseModel):
     id: int
     name: str
-    main_folder_name: str  # Include main folder name if needed
+    main_folder_name: str
     path: str
     main_folder_path: str
 
@@ -97,7 +100,7 @@ class VideoSchema(BaseModel):
 class SubfolderSchema(BaseModel):
     id: int
     name: str
-    videos: List[VideoSchema]  # List of videos inside each subfolder
+    videos: List[VideoSchema]
 
     class Config:
         orm_mode = True
