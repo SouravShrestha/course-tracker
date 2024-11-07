@@ -3,6 +3,7 @@ import checkIcon from "../assets/images/check.png";
 import newIcon from "../assets/images/new.png";
 import progressIcon from "../assets/images/progress.png";
 import playingIcon from "../assets/images/playing.png";
+import {convertDurationToSeconds} from "../utils/convertors"
 
 const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPath }) => { 
 
@@ -39,12 +40,6 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
       video.progress = videoProgress[video.id]; // Set progress if key exists
     }
     onVideoClick(video);
-  };
-
-  // Function to convert duration "MM:SS" to seconds
-  const convertDurationToSeconds = (duration) => {
-    const [minutes, seconds] = duration.split(":").map(Number);
-    return minutes * 60 + seconds;
   };
 
   return (

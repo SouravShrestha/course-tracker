@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const BASE_URL = "http://localhost:8000/api";
 
 const handleResponse = async (response) => {
@@ -35,4 +37,94 @@ export const checkFolderExists = async (path) => {
   if (!response.ok)
     throw new Error("🚫 Invalid path entered. Enter the full folder path.");
   return true;
+};
+
+export const getNotesB = async (videoId) => {
+  try {
+    const response = await fetch(
+      `${BASE_URL}/videos/${videoId}/notes`
+    );
+    return await response.json();
+  } catch (error) {
+    throw new Error("Error fetching notes:", error);
+  }
+};
+
+// Function to update video progress
+export const updateVideoProgressB = async (videoId, progress) => {
+  try {
+    progress = progress.toFixed(0);
+    await axios.put(`${BASE_URL}/videos/${videoId}`, {
+      progress: progress,
+    });
+  } catch (error) {
+    throw new Error("Failed to update video progress:", error.request);
+  }
+};
+
+export const fetchTags = async () => {
+  const response = await fetch(`${BASE_URL}/tags`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch tags");
+  }
+  return await response.json();
+};
+
+export const fetchFoldersByPath = async (path) => {
+  try {
+    const response = await fetch(`${BASE_URL}/folders`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      params: {
+        path: path
+      }
+    });
+    const data = await handleResponse(response);
+    return data;
+  } catch (error) {
+    throw new Error("Failed to fetch folders by path:", error);
+  }
+};
+
+export const addTagToFolder = async (folderId, tag) => {
+  try {
+    const response = await axios.put(`${BASE_URL}/folders/${folderId}/tags`, { name: tag });
+    return response.data; // Assuming the response contains the updated list of tags
+  } catch (error) {
+    console.error("Error adding tag to folder:", error);
+    throw error; // Rethrow the error for handling elsewhere
+  }
+};
+
+export const removeTagFromFolder = async (folderId, tagName) => {
+  try {
+    const encodedTagName = encodeURIComponent(tagName);
+    const response = await axios.delete(`${BASE_URL}/folders/${folderId}/tags/${encodedTagName}`);
+    return response.data; // Assuming the response contains the removed tag or confirmation
+  } catch (error) {
+    console.error("Error removing tag from folder:", error);
+    throw error; // Rethrow the error for handling elsewhere
+  }
+};
+
+export const getTagsOfFolder = async (folderId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/folders/${folderId}/tags`);
+    return response.data; // Return the list of tags
+  } catch (error) {
+    console.error("Error fetching tags for folder:", error);
+    throw error; // Rethrow the error for handling elsewhere
+  }
+};
+
+export const deleteUnmappedTags = async () => {
+  try {
+      const response = await axios.delete(`${BASE_URL}/tags/unmapped`);
+      return response.data; // Return the response data for further processing
+  } catch (error) {
+      console.error('Error deleting unmapped tags:', error);
+      throw error; // Rethrow the error to handle it in the calling code
+  }
 };

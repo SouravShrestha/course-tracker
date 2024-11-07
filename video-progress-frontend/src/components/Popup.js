@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { checkFolderExists } from "../utils/api";
+import newFolderIcon from "../assets/images/add-folder.png";
 
 const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
   const [folderPath, setFolderPath] = useState("");
@@ -69,7 +70,7 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-opacity-70 bg-primarydark z-10">
-      <div className="px-8 py-6 bg-primarydark w-1/3 border border-colorborder relative">
+      <div className="px-8 py-6 bg-primary lg:w-1/3 border border-colorborder relative md:w-1/2 sm:w-3/4 w-4/5">
         <button
           className="absolute top-0 right-2 text-colortext hover:text-red-400 text-xl"
           onClick={onClose}
@@ -84,7 +85,7 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
               folders.map((folder, index) => (
                 <div
                   key={index}
-                  className="px-2 py-1 border border-colorborder mr-3 mb-3 cursor-pointer hover:bg-red-600 rounded-md"
+                  className="px-2 py-1 border border-colorborder mr-3 mb-3 cursor-pointer hover:bg-gradient-to-r hover:from-gradientStart hover:to-gradientEnd rounded-sm transition-colors duration-200 ease-in-out"
                   onClick={() => handleRemoveFolder(folder)}
                 >
                   {folder}
@@ -97,14 +98,21 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
             )}
           </div>
         </div>
-        <h2 className="text-base font-semibold mb-4">Add a new folder</h2>
+        <div className="flex items-center mb-4">
+          <img
+            src={newFolderIcon}
+            alt="Settings"
+            className="w-5 h-5 mr-3" // Add margin to the right of the icon
+          />
+          <h2 className="text-base font-semibold">Add a new folder</h2>
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="relative flex items-center">
             <input
               type="text"
               value={folderPath}
               onChange={(e) => setFolderPath(e.target.value)}
-              className="w-full py-1.5 bg-primarydark sm:text-sm sm:leading-6 border-colorborder border px-2 mb-4"
+              className="w-full py-1.5 bg-primarydark sm:text-sm sm:leading-6 border-colorborder border px-2 pr-10 mb-4"
               placeholder="Enter new folder path"
               ref={inputRef}
             />

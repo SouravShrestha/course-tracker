@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import HomePage from './components/HomePage'; 
 import Header from './components/Header'; 
-import FolderDetail from './components/FolderDetails';
+import CourseDetail from './components/CourseDetail';
 
 const App = () => {
   return (
@@ -11,7 +11,7 @@ const App = () => {
         <Header /> {/* Render the header */}
         <Routes>
           <Route path="/" element={<HomePage />} /> {/* Set the default route to HomePage */}
-          <Route path="/folder/:id" element={<FolderDetail />} />
+          <Route path="/folder/:id" element={<CourseDetail />} />
         </Routes>
       </div>
     </Router>

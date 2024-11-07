@@ -1,10 +1,17 @@
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, DateTime, Float, Integer, String, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, DateTime, Float, Integer, String, ForeignKey, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 import pytz
+
+folder_tags = Table(
+    'folder_tags',
+    Base.metadata,
+    Column('folder_id', Integer, ForeignKey('folders.id')),
+    Column('tag_id', Integer, ForeignKey('tags.id'))
+)
 
 class MainFolder(Base):
     __tablename__ = "main_folders"
@@ -13,6 +20,11 @@ class MainFolder(Base):
     path = Column(String, unique=True)
     folders = relationship("Folder", back_populates="main_folder", cascade="all, delete-orphan")
 
+class Tag(Base):
+    __tablename__ = "tags"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+
 class Folder(Base):
     __tablename__ = "folders"
     id = Column(Integer, primary_key=True, index=True)
@@ -20,6 +32,7 @@ class Folder(Base):
     main_folder_id = Column(Integer, ForeignKey("main_folders.id"))
     main_folder = relationship("MainFolder", back_populates="folders")
     subfolders = relationship("Subfolder", back_populates="folder", cascade="all, delete-orphan")
+    tags = relationship("Tag", secondary=folder_tags)
     __table_args__ = (UniqueConstraint('main_folder_id', 'name', name='uq_main_folder_name'),)
 
 class Subfolder(Base):
@@ -62,16 +75,31 @@ class UpdateVideoRequest(BaseModel):
     progress: Optional[int] = Field(None, ge=0)
     notes: Optional[str] = None
 
+class TagSchema(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
 class FolderResponse(BaseModel):
     id: int
     name: str
     main_folder_name: str
     path: str
     main_folder_path: str
+    tags: List[TagSchema] = []
 
 class NoteCreateSchema(BaseModel):
     video_id: int
     content: str
+
+    class Config:
+        orm_mode = True
+
+
+class TagCreateSchema(BaseModel):
+    name: str
 
     class Config:
         orm_mode = True

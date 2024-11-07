@@ -20,6 +20,10 @@ export const theme = {
       gradientEnd: "#EB4511",
       gradientEnd2: "#ec4899",
     },
+    height:{
+      "p90": "90%",
+      "p10": "10%",
+    },
     minWidth: {
       "1/2": "33%", // Adds min-w-1/2
       "17/20": "85%",

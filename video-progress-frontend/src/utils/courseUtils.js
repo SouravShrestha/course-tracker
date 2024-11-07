@@ -3,8 +3,6 @@ export const calculateVideoStats = (folders) => {
   let startedVideosCount = 0;
   let totalProgress = 0;
 
-  console.log(folders);
-
   folders?.subfolders.forEach((subfolder) => {
 
     const videos = subfolder.videos;
@@ -14,14 +12,13 @@ export const calculateVideoStats = (folders) => {
       if (video.progress > 0) {
         startedVideosCount++;
       }
-      totalProgress += video.progress;
+      totalProgress += video.progress > 0 ? 1 : 0;
     });
+
   });
 
   const completionPercentage =
-    numberOfVideos > 0 ? (totalProgress / numberOfVideos) * 100 : 0;
+    numberOfVideos > 0 ? Math.round((totalProgress / numberOfVideos) * 100) : 0;
 
   return { numberOfVideos, startedVideosCount, completionPercentage };
 };
-
-export default calculateVideoStats;

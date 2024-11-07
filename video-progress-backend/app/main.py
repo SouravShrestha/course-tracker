@@ -1,12 +1,12 @@
 import glob
 import os
-from typing import List
-from fastapi import FastAPI, Depends, HTTPException
+from typing import List, Optional
+from fastapi import Body, FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal, engine
-from app.models import Base, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest
+from app.models import Base, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, TagCreateSchema, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, folder_tags
 from app.utils import scan_folder
 from moviepy.editor import VideoFileClip
 
@@ -147,7 +147,10 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
                         ]
                     }
                     for subfolder_obj in folder_obj.subfolders
-                ]
+                ],
+                "tags": [
+                {"id": tag.id, "name": tag.name} for tag in folder_obj.tags
+            ] 
             }
             for folder_obj in main_folder.folders
         ]
@@ -156,15 +159,26 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
     return response
 
 @app.get("/api/folders", response_model=List[FolderResponse])
-def get_folders(db: Session = Depends(get_db)):
-    folders = db.query(Folder).options(joinedload(Folder.main_folder)).all()
+def get_folders(path: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(Folder).options(joinedload(Folder.main_folder))
+
+    # If a path is provided, filter the folders by path
+    if path:
+        query = query.filter(Folder.main_folder.path.equals(path))
+
+    folders = query.all()
+    
+    if not folders:
+        raise HTTPException(status_code=404, detail="No folders found for the given path")
+
     return [
         {
             "id": folder.id,
             "name": folder.name,
             "main_folder_name": folder.main_folder.name,
             "path": os.path.join(folder.main_folder.path, folder.name),
-            "main_folder_path": folder.main_folder.path
+            "main_folder_path": folder.main_folder.path,
+            "tags": folder.tags
         }
         for folder in folders
     ]
@@ -240,3 +254,100 @@ def update_note(note_id: int, note: NoteSchema, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(existing_note)
     return existing_note
+
+@app.get("/api/tags", response_model=List[TagSchema])
+def get_tags(db: Session = Depends(get_db)):
+    tags = db.query(Tag).order_by(Tag.name).all() # Assuming Tag is defined in your models
+    return tags
+
+@app.post("/api/tags", response_model=TagSchema)
+def create_tag(tag: TagSchema, db: Session = Depends(get_db)):
+    existing_tag = db.query(Tag).filter(Tag.name == tag.name).first()
+    if existing_tag:
+        raise HTTPException(status_code=400, detail="Tag already exists")
+    
+    new_tag = Tag(name=tag.name)
+    db.add(new_tag)
+    db.commit()
+    db.refresh(new_tag)
+    return new_tag
+
+@app.put("/api/folders/{folder_id}/tags", response_model=TagSchema)
+def add_tag_to_folder(folder_id: int, tag_schema: TagCreateSchema, db: Session = Depends(get_db)):
+    # Fetch the folder based on folder_id
+    folder = db.query(Folder).filter(Folder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    name = tag_schema.name
+    
+    # Check if the tag already exists in the database
+    existing_tag = db.query(Tag).filter(Tag.name == name).first()
+    
+    # If the tag exists and is not already mapped, map it to the folder
+    if existing_tag:
+        existing_tag_names = {tag.name for tag in folder.tags}
+        if name not in existing_tag_names:
+            folder.tags.append(existing_tag)
+            db.commit()  # Commit changes if we modified the tags
+            db.refresh(folder)
+    
+        # Return the existing tag
+        return existing_tag
+    
+    # Create a new tag if it doesn't exist
+    new_tag = Tag(name=name)
+    db.add(new_tag)
+    folder.tags.append(new_tag)
+    
+    db.commit()  # Commit changes to save the new tag
+    db.refresh(folder)
+    
+    # Return the newly created tag
+    return new_tag
+
+@app.delete("/api/folders/{folder_id}/tags/{tag_name}", response_model=TagSchema)
+def remove_tag_from_folder(folder_id: int, tag_name: str, db: Session = Depends(get_db)):
+    # Fetch the folder based on folder_id
+    folder = db.query(Folder).filter(Folder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    # Find the tag by name in the folder's tags
+    tag_to_remove = next((tag for tag in folder.tags if tag.name == tag_name), None)
+    
+    if tag_to_remove is None:
+        raise HTTPException(status_code=404, detail="Tag not found in the folder")
+
+    # Remove the tag from the folder
+    folder.tags.remove(tag_to_remove)
+    db.commit()  # Commit changes to save the updated folder
+
+    return tag_to_remove  # Return the removed tag
+
+@app.get("/api/folders/{folder_id}/tags", response_model=List[TagSchema])
+def get_tags_of_folder(folder_id: int, db: Session = Depends(get_db)):
+    # Fetch the folder based on folder_id
+    folder = db.query(Folder).filter(Folder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Retrieve tags associated with the folder
+    tags = folder.tags  # Assuming `tags` is a relationship in the Folder model
+
+    return tags
+
+@app.delete("/api/tags/unmapped", response_model=dict)
+def delete_unmapped_tags(db: Session = Depends(get_db)):
+    # Query for tags that are not linked to any folders
+    unmapped_tags = db.query(Tag).outerjoin(folder_tags).filter(folder_tags.c.tag_id.is_(None)).all()
+
+    # Delete unmapped tags
+    for tag in unmapped_tags:
+        db.delete(tag)
+
+    # Commit the changes
+    db.commit()
+
+    return {"detail": f"Deleted {len(unmapped_tags)} unmapped tags."}
+

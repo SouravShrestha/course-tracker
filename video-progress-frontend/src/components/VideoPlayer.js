@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import reloadIcon from "../assets/images/reload.png";
 import reloadPlainIcon from "../assets/images/restart-plain.png";
 import checkPlainIcon from "../assets/images/check-solid.png";
 import pointIcon from "../assets/images/point.png";
 import NoteCard from "./NoteCard";
 import AddNote from "./AddNote";
+import { updateVideoProgressB, getNotesB } from "../utils/api";
 
 const VideoPlayer = ({
   videoPath,
@@ -24,7 +24,7 @@ const VideoPlayer = ({
 
   const toggleSwitchRef = useRef(null);
 
-  const [isCompletedElsewhere, setIsCompletedElsewhere] = useState(true); 
+  const [isCompletedElsewhere, setIsCompletedElsewhere] = useState(true);
 
   const [autoplay, setAutoplay] = useState(() => {
     // Initialize autoplay from localStorage
@@ -41,18 +41,11 @@ const VideoPlayer = ({
 
   // Function to fetch the notes for a video
   const fetchNotes = async () => {
-    try {
-      if (!video?.id) {
-        return;
-      }
-      const response = await fetch(
-        `http://localhost:8000/api/videos/${video.id}/notes`
-      );
-      const data = await response.json();
-      setNotes(data);
-    } catch (error) {
-      console.error("Error fetching notes:", error);
+    if (!video?.id) {
+      return;
     }
+    var allNotes = await getNotesB(video.id);
+    setNotes(allNotes);
   };
 
   useEffect(() => {
@@ -75,7 +68,7 @@ const VideoPlayer = ({
     if (videoRef.current) {
       videoRef.current.currentTime = video.progress;
 
-      if(video.progress >= videoRef.current.duration.toFixed(0) || !autoplay){
+      if (video.progress >= videoRef.current.duration.toFixed(0) || !autoplay) {
         videoRef.current.pause();
       }
 
@@ -113,22 +106,13 @@ const VideoPlayer = ({
   };
 
   const updateCurrentTime = (id, currentTime) => {
-    // Update progress in the backend
     updateVideoProgress(id, currentTime);
-    setLastUpdateTime(currentTime); // Set the last update time to the current time
+    setLastUpdateTime(currentTime);
   };
 
-  // Function to update video progress in the backend
   const updateVideoProgress = async (videoId, progress) => {
-    try {
-      progress = progress.toFixed(0);
-      await axios.put(`http://localhost:8000/api/update-video/${videoId}`, {
-        progress: progress,
-      });
-      cUpdateVideoProgress(videoId, progress);
-    } catch (error) {
-      console.error("Failed to update video progress:", error.request);
-    }
+    await updateVideoProgressB(videoId, progress);
+    cUpdateVideoProgress(videoId, progress);
   };
 
   // Function to handle video end
@@ -173,19 +157,19 @@ const VideoPlayer = ({
     if (video) {
       // Update the video's progress to its duration
       const totalDuration = videoRef.current.duration;
-  
+
       // Update progress in the backend
       await updateVideoProgress(video.id, totalDuration);
-  
+
       // Set the last update time to the total duration
       setLastUpdateTime(totalDuration);
-  
+
       // Optionally navigate to the next video
       if (nextVideo) {
         onVideoChange(nextVideo);
       }
     }
-  };  
+  };
 
   useEffect(() => {
     // Function to handle key down events

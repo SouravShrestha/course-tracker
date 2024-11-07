@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import LibraryExplorer from "./LibraryExplorer"; // Import your LibraryExplorer component
 import VideoPlayer from "./VideoPlayer"; // Import your VideoPlayer component
 
-const FolderDetail = () => {
+const CourseDetail = () => {
   const { id } = useParams(); // Course ID
   const [contents, setContents] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState("");
@@ -33,12 +33,10 @@ const FolderDetail = () => {
 
   // Function to update video progress
   const updateVideoProgress = (videoId, progress) => {
-
     setVideoProgress((prevProgress) => ({
       ...prevProgress,
       [videoId]: progress,
     }));
-
   };
 
   const videoList = contents.flatMap((content) => content.videos || []);
@@ -79,4 +77,4 @@ const FolderDetail = () => {
   );
 };
 
-export default FolderDetail;
+export default CourseDetail;
