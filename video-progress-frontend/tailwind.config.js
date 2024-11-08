@@ -34,6 +34,7 @@ export const theme = {
     width: {
       p79: "79%",
       p21: "21%",
+      p18: "18%",
       p49: "49%",
     },
     fontWeight: {

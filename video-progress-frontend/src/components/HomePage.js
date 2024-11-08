@@ -130,6 +130,7 @@ const HomePage = () => {
 
   useEffect(() => {
     // Filter courses based on filterTags
+    setFilteredCourses([])
     scannedMainFolders.map((folder) => {
       // Filter the courses in the current folder
       const filteredCourses =
@@ -148,11 +149,6 @@ const HomePage = () => {
   const updateTags = async (folderId) => {
     try {
       var fetchedTags = await fetchTags();
-      setFilterTags((prevFilterTags) => {
-        const fetchedTagIds = new Set(fetchedTags.map(tag => tag.id));
-        const filtered = prevFilterTags.filter(tag => fetchedTagIds.has(tag.id));
-        return filtered;
-      });
       const updatedTags = fetchedTags
         .filter(
           (tag) => !filterTags.some((filterTag) => filterTag.id === tag.id) // Exclude tags already in filterTags

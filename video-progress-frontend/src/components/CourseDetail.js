@@ -49,7 +49,7 @@ const CourseDetail = () => {
 
   return (
     <div className="flex w-full">
-      <div className="float-left w-p21 text-colortextsecondary px-8 sticky top-0 overflow-y-auto h-[calc(100vh-6rem)] select-none pb-2 my-2">
+      <div className="float-left w-p21 text-colortextsecondary sticky top-0 overflow-y-auto h-[calc(100vh-6rem)] select-none my-4 px-2">
         <LibraryExplorer
           contents={contents}
           onVideoClick={handleVideoClick}

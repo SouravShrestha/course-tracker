@@ -98,7 +98,7 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
             )}
           </div>
         </div>
-        <div className="flex items-center mb-4">
+        <div className="flex items-center mb-4 mt-5">
           <img
             src={newFolderIcon}
             alt="Settings"
