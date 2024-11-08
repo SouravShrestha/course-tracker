@@ -83,13 +83,11 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
     onVideoClick(video);
   };
 
-  // Function to close the dropdown if clicked outside
   const handleClickOutside = (event) => {
-    console.log(dropdownRef.current, event.target)
-    if (dropdownRef.current && !contentRefs.current.contains(event.target)) {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && !event.target.closest('.dropdown-toggle')) {
       setDropdownVisible(false);
     }
-  };
+  };  
 
   // Add the click event listener for clicks outside the dropdown
   useEffect(() => {
@@ -103,6 +101,7 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
     <div className="relative ml-3 mr-3">
       {dropdownVisible && (
         <div
+          ref={dropdownRef}
           className="dropdown-list fixed z-20 text-base font-semibold mt-3 bg-primarydark border border-colorborder shadow-none -mx-3.5 w-1/5"
           style={{ top: `${dropdownPosition}px` }}
         >
@@ -132,12 +131,12 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
             key={content.id}
             ref={(el) => (contentRefs.current[index] = el)}
           >
-            <div className="text-base font-semibold cursor-pointer sticky top-0 overflow-hidden bg-primary -ml-1 pl-1">
+            <div className="text-base font-semibold cursor-pointer sticky top-0 overflow-hidden bg-primary -ml-1 pl-1 dropdown-toggle">
               <div
-                className="flex items-center pb-3"
+                className="flex items-center pb-3 dropdown-toggle"
                 onClick={(e) => handleChapterClick(e)}
               >
-                <span className="mr-3 flex items-center justify-center w-7 h-7 rounded-sm bg-gradient-to-r from-gradientEnd to-gradientStart text-white font-semibold">
+                <span className="mr-3 flex items-center justify-center w-7 h-7 rounded-sm bg-gradient-to-r from-gradientEnd to-gradientStart text-white font-semibold dropdown-toggle">
                   {index + 1}
                 </span>
                 <span className="chapter">
