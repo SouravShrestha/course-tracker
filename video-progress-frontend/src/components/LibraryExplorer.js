@@ -9,7 +9,8 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
 
   const [dropdownVisible, setDropdownVisible] = useState(false); // State to toggle dropdown visibility
   const contentRefs = useRef([]); // Ref to track content sections for scrolling
-  const videoRefs = useRef([])
+  const videoRefs = useRef([]);
+  const dropdownRef = useRef(null);
   const [dropdownPosition, setDropdownPosition] = useState(0);
 
   const handleContentClick = (index) => {
@@ -82,8 +83,24 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
     onVideoClick(video);
   };
 
+  // Function to close the dropdown if clicked outside
+  const handleClickOutside = (event) => {
+    console.log(dropdownRef.current, event.target)
+    if (dropdownRef.current && !contentRefs.current.contains(event.target)) {
+      setDropdownVisible(false);
+    }
+  };
+
+  // Add the click event listener for clicks outside the dropdown
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
-    <div className="relative ml-3 mr-3 shadow-inner">
+    <div className="relative ml-3 mr-3">
       {dropdownVisible && (
         <div
           className="dropdown-list fixed z-20 text-base font-semibold mt-3 bg-primarydark border border-colorborder shadow-none -mx-3.5 w-1/5"
@@ -115,7 +132,7 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
             key={content.id}
             ref={(el) => (contentRefs.current[index] = el)}
           >
-            <div className="text-base font-semibold cursor-pointer sticky top-0 overflow-hidden bg-primary">
+            <div className="text-base font-semibold cursor-pointer sticky top-0 overflow-hidden bg-primary -ml-1 pl-1">
               <div
                 className="flex items-center pb-3"
                 onClick={(e) => handleChapterClick(e)}
@@ -129,12 +146,12 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
               </div>
               <hr className="border-colorborder" />
             </div>
-            <ul className="mt-3 mr-2 w-full space-y-3">
+            <ul className="mt-3 mr-2 pl-1 w-full space-y-3">
               {content.videos
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map((video, index) => (
                   <li
-                  ref={(el) => (videoRefs.current[video.id] = el)}
+                    ref={(el) => (videoRefs.current[video.id] = el)}
                     className={`flex justify-between text-base py-1 items-center cursor-pointer bg-clip-text ${
                       video.path === activeVideoPath
                         ? "text-transparent font-550 bg-gradient-to-r from-gradientEnd to-gradientStart"

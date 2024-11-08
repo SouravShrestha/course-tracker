@@ -58,6 +58,6 @@ code {
   transition: background-color 0.2s ease-in-out; /* Adjust the duration and easing function as needed */
 }
 
-.filter-secondary{
+.filter-secondary {
   filter: brightness(0) saturate(100%) invert(79%) sepia(3%) saturate(1210%) hue-rotate(174deg) brightness(77%) contrast(79%);
 }
