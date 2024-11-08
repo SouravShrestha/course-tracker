@@ -275,15 +275,15 @@ const HomePage = () => {
       <div className="absolute right-5 top-5">
         {/* Settings button (Dropdown menu) */}
         <button
-          className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center"
+          className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center group"
           onClick={toggleDropdown}
         >
           <img
             src={settingsIcon}
             alt="Settings"
-            className="h-6 aspect-auto transition-transform duration-150 ease-in-out hover:scale-105 cursor-pointer filter-secondary"
+            className="h-6 aspect-auto cursor-pointer group-hover:filter-primary filter-secondary"
           />
-          <span className="ml-1.5 font-meidum text-sm text-colortextsecondary">
+          <span className="ml-1.5 font-meidum text-sm text-colortextsecondary group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-gradientEnd group-hover:to-gradientStart bg-clip-text">
             Manage
           </span>
         </button>

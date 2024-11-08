@@ -319,26 +319,26 @@ const VideoPlayer = ({
 
             {/* restart */}
             <div
-              className="flex flex-col items-center w-full cursor-pointer transition-transform duration-200 ease-in-out bg-clip-text hover:text-transparent hover:bg-gradient-to-r hover:from-gradientEnd hover:to-gradientStart hover:scale-105"
+              className="flex flex-col items-center w-full cursor-pointer transition-transform duration-200 ease-in-out bg-clip-text hover:text-transparent hover:bg-gradient-to-r hover:from-gradientEnd hover:to-gradientStart hover:scale-105 group"
               onClick={handleRestart}
             >
               <img
                 src={reloadPlainIcon}
                 alt="Reload Icon"
-                className="inline-block w-4 h-4"
+                className="inline-block w-4 h-4 group-hover:filter-primary"
               />
               <span className="mt-3 text-xs">Restart</span>
             </div>
 
             {/* mark as complete */}
             <div
-              className="flex flex-col items-center w-full cursor-pointer transition-transform duration-200 ease-in-out bg-clip-text hover:text-transparent hover:bg-gradient-to-r hover:from-gradientEnd hover:to-gradientStart hover:scale-105"
+              className="flex flex-col items-center w-full cursor-pointer transition-transform duration-200 ease-in-out bg-clip-text hover:text-transparent hover:bg-gradient-to-r hover:from-gradientEnd hover:to-gradientStart hover:scale-105 group"
               onClick={handleMarkComplete}
             >
               <img
                 src={checkPlainIcon}
                 alt="Complete Icon"
-                className="inline-block w-4 h-4"
+                className="inline-block w-4 h-4 group-hover:filter-primary"
               />
               <span className="mt-3 text-xs text-center leading-4">
                 Mark complete

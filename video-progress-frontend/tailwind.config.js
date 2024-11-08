@@ -2,6 +2,9 @@
 export const content = ["./src/**/*.{js,jsx,ts,tsx}"];
 export const theme = {
   extend: {
+    filter: {
+      'primary': 'brightness(0) saturate(100%) invert(23%) sepia(85%) saturate(1678%) hue-rotate(351deg) brightness(88%) contrast(103%)',
+    },
     fontSize: {
       xxl: "1.75rem",
       xxs: "0.65rem",
@@ -42,4 +45,6 @@ export const theme = {
     },
   },
 };
-export const plugins = [];
+export const plugins = [
+  require('tailwindcss-filters'),  // Add the tailwindcss-filters plugin here
+];
