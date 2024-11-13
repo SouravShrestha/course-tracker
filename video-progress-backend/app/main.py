@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal, engine
-from app.models import Base, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, TagCreateSchema, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, folder_tags
+from app.models import Base, FolderLastPlayed, FolderLastPlayedSchema, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, TagCreateSchema, UpdateLastPlayedRequest, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, VideoSchema, current_time_ist, folder_tags
 from app.utils import scan_folder
 from moviepy.editor import VideoFileClip
 
@@ -96,6 +96,7 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
     folder_structure = scan_folder(main_folder_path)
     for folder in folder_structure:
         folder_obj = db.query(Folder).filter_by(name=folder['name'], main_folder_id=main_folder.id).first() or Folder(main_folder_id=main_folder.id, name=folder['name'])
+        
         db.add(folder_obj)
         db.commit()
         db.refresh(folder_obj)
@@ -150,7 +151,18 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
                 ],
                 "tags": [
                 {"id": tag.id, "name": tag.name} for tag in folder_obj.tags
-            ] 
+                ],
+                "last_played_video": (
+                    {
+                        "id": folder_obj.last_played_video.video.id,
+                        "name": folder_obj.last_played_video.video.name,
+                        "path": folder_obj.last_played_video.video.path,
+                        "progress": folder_obj.last_played_video.video.progress,
+                        "duration": folder_obj.last_played_video.video.duration
+                    }
+                    if folder_obj.last_played_video else None
+                ),
+                "last_played_at": folder_obj.last_played_video.last_played_at if folder_obj.last_played_video else None 
             }
             for folder_obj in main_folder.folders
         ]
@@ -160,28 +172,65 @@ def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = D
 
 @app.get("/api/folders", response_model=List[FolderResponse])
 def get_folders(path: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(Folder).options(joinedload(Folder.main_folder))
+    query = db.query(Folder).options(
+        joinedload(Folder.main_folder),
+        joinedload(Folder.last_played_video)
+    )
 
     # If a path is provided, filter the folders by path
     if path:
         query = query.filter(Folder.main_folder.path.equals(path))
 
     folders = query.all()
-    
+
     if not folders:
         raise HTTPException(status_code=404, detail="No folders found for the given path")
 
     return [
-        {
-            "id": folder.id,
-            "name": folder.name,
-            "main_folder_name": folder.main_folder.name,
-            "path": os.path.join(folder.main_folder.path, folder.name),
-            "main_folder_path": folder.main_folder.path,
-            "tags": folder.tags
-        }
+        FolderResponse(
+            id=folder.id,
+            name=folder.name,
+            main_folder_name=folder.main_folder.name,
+            path=os.path.join(folder.main_folder.path, folder.name),
+            main_folder_path=folder.main_folder.path,
+            tags=folder.tags,
+            last_played_video=(
+                VideoSchema.from_orm(folder.last_played_video.video) if folder.last_played_video else None
+            ),
+            last_played_at=(
+                folder.last_played_video.last_played_at if folder.last_played_video else None
+            )
+        )
         for folder in folders
     ]
+
+@app.get("/api/folders/{folder_id}", response_model=FolderResponse)
+def get_folder_by_id(folder_id: int, db: Session = Depends(get_db)):
+    # Query the folder by its ID, with necessary relationships loaded
+    folder = db.query(Folder).options(
+        joinedload(Folder.main_folder),
+        joinedload(Folder.last_played_video)
+    ).filter(Folder.id == folder_id).first()
+
+    # If the folder does not exist, raise an HTTP 404 error
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Return the folder response
+    return FolderResponse(
+        id=folder.id,
+        name=folder.name,
+        main_folder_name=folder.main_folder.name,
+        path=os.path.join(folder.main_folder.path, folder.name),
+        main_folder_path=folder.main_folder.path,
+        tags=folder.tags,
+        last_played_video=(
+            VideoSchema.from_orm(folder.last_played_video.video) if folder.last_played_video else None
+        ),
+        last_played_at=(
+            folder.last_played_video.last_played_at if folder.last_played_video else None
+        )
+    )
 
 @app.get("/api/folder-exists/")
 def folder_exists(folder_path: str):
@@ -215,6 +264,31 @@ def update_video(video_id: int, request: UpdateVideoRequest, db: Session = Depen
 
     db.commit()
     db.refresh(video)
+
+    if(video.progress != 0):
+
+        # Now update the FolderLastPlayed table to reflect this video's progress
+        folder = video.subfolder.folder  # Get the folder related to the video
+
+        # Check if there is an existing FolderLastPlayed entry for this folder
+        last_played = db.query(FolderLastPlayed).filter(FolderLastPlayed.folder_id == folder.id).first()
+
+        if last_played:
+            # If a FolderLastPlayed record exists, update the video_id and the last_played_at timestamp
+            last_played.video_id = video.id
+            last_played.last_played_at = current_time_ist()  # Update the last played time
+        else:
+            # If no FolderLastPlayed record exists, create a new one
+            new_last_played = FolderLastPlayed(
+                folder_id=folder.id,
+                video_id=video.id,
+                last_played_at=current_time_ist()  # Set current timestamp for the first time the video is played
+            )
+            db.merge(last_played)
+
+        # Commit the changes to the FolderLastPlayed table
+        db.commit()
+
     return {"message": "Video updated successfully.", "video": {"id": video.id, "progress": video.progress}}
 
 @app.post("/api/videos/{video_id}/notes", response_model=NoteCreateSchema)
@@ -351,3 +425,38 @@ def delete_unmapped_tags(db: Session = Depends(get_db)):
 
     return {"detail": f"Deleted {len(unmapped_tags)} unmapped tags."}
 
+@app.put("/api/folders/{folder_id}/last_played", response_model=FolderLastPlayedSchema)
+def update_last_played_video(folder_id: int, update_request: UpdateLastPlayedRequest, db: Session = Depends(get_db)):
+    video_id = update_request.video_id
+    # Check if the folder exists
+    folder = db.query(Folder).filter(Folder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    
+    # Check if the video exists
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    # Update or create the FolderLastPlayed record
+    last_played = db.query(FolderLastPlayed).filter(FolderLastPlayed.folder_id == folder_id).first()
+    if last_played:
+        last_played.video_id = video_id
+        last_played.last_played_at = current_time_ist()
+    else:
+        last_played = FolderLastPlayed(folder_id=folder_id, video_id=video_id, last_played_at=current_time_ist())
+        db.add(last_played)
+
+    db.commit()
+    db.refresh(last_played)
+    
+    return last_played
+
+@app.get("/api/folders/{folder_id}/last_played", response_model=FolderLastPlayedSchema)
+def get_last_played_video(folder_id: int, db: Session = Depends(get_db)):
+    # Retrieve the last played video record for the folder
+    last_played = db.query(FolderLastPlayed).filter(FolderLastPlayed.folder_id == folder_id).first()
+    if not last_played:
+        raise HTTPException(status_code=404, detail="Last played video not found for this folder")
+    
+    return last_played

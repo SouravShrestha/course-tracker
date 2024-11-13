@@ -3,10 +3,15 @@ import checkIcon from "../assets/images/check.png";
 import newIcon from "../assets/images/new.png";
 import progressIcon from "../assets/images/progress.png";
 import playingIcon from "../assets/images/playing.png";
-import {convertDurationToSeconds} from "../utils/convertors"
+import { convertDurationToSeconds } from "../utils/convertors";
 
-const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPath }) => { 
-
+const LibraryExplorer = ({
+  contents,
+  onVideoClick,
+  videoProgress,
+  activeVideoPath,
+  videoIdToPlay,
+}) => {
   const [dropdownVisible, setDropdownVisible] = useState(false); // State to toggle dropdown visibility
   const contentRefs = useRef([]); // Ref to track content sections for scrolling
   const videoRefs = useRef([]);
@@ -19,11 +24,11 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
   };
 
   const handleChapterClick = (event) => {
-    setDropdownVisible(!dropdownVisible)
+    setDropdownVisible(!dropdownVisible);
     let clickedDiv = event.target;
-    if (clickedDiv.tagName === 'DIV') {
+    if (clickedDiv.tagName === "DIV") {
       // Get the clickedDiv's child span with class "chapter"
-      clickedDiv = clickedDiv.querySelector('span.chapter');
+      clickedDiv = clickedDiv.querySelector("span.chapter");
     }
     // Get the bounding rectangle of the clicked div
     const rect = clickedDiv.getBoundingClientRect();
@@ -49,6 +54,23 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
   }, [activeVideoPath]);
 
   useEffect(() => {
+
+    const findPassedVideo = (videoId) => {
+      // If videoId exists, try to find the corresponding video
+      if (videoId) {
+        for (const contentElement of contents) {
+          if (contentElement.videos) {
+            const video = contentElement.videos.find(
+              (video) => video.id.toString() === videoId.toString()
+            );
+            if (video) {
+              return video;
+            }
+          }
+        }
+      }
+    };
+
     // Function to find the first unwatched video
     const findFirstUnwatchedVideo = () => {
       let firstVideo = null;
@@ -70,7 +92,7 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
     };
 
     // Get the first unwatched video and click it
-    const unwatchedVideo = findFirstUnwatchedVideo();
+    const unwatchedVideo = videoIdToPlay ? findPassedVideo(videoIdToPlay) : findFirstUnwatchedVideo();
     if (unwatchedVideo) {
       onVideoClick(unwatchedVideo); // Trigger the video click event
     }
@@ -84,10 +106,14 @@ const LibraryExplorer = ({ contents, onVideoClick, videoProgress, activeVideoPat
   };
 
   const handleClickOutside = (event) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target) && !event.target.closest('.dropdown-toggle')) {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target) &&
+      !event.target.closest(".dropdown-toggle")
+    ) {
       setDropdownVisible(false);
     }
-  };  
+  };
 
   // Add the click event listener for clicks outside the dropdown
   useEffect(() => {

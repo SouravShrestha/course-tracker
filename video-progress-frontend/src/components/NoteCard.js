@@ -38,9 +38,16 @@ const NoteCard = forwardRef(({ note, reloadNotes, isLast }, ref) => {
   };
 
   return (
-    <div ref={ref} className={`w-full mb-5 select-text ${!isLast ? 'border-b border-colorborder' : ''}`}>
+    <div
+      ref={ref}
+      className={`w-full mb-5 select-text ${
+        !isLast ? "border-b border-colorborder" : ""
+      }`}
+    >
       {/* 1st row: Date and Time */}
-      <div className="text-xs text-colortextsecondary">{formatDate(note.created_at)}</div>
+      <div className="text-xs text-colortextsecondary">
+        {formatDate(note.created_at)}
+      </div>
 
       {/* 2nd row: Actual row */}
       <div
@@ -50,10 +57,14 @@ const NoteCard = forwardRef(({ note, reloadNotes, isLast }, ref) => {
 
       {/* 3rd row: Edit and Delete buttons */}
       <div className="my-4 flex space-x-4 text-xs select-none text-colortextsecondary">
-        <button className="cursor-pointer hover:text-yellow-500">Edit</button>
-        <button className="cursor-pointer hover:text-gradientStart" onClick={() => setIsModalOpen(true)}>Delete</button>
+        <button
+          className="cursor-pointer hover:text-gradientStart"
+          onClick={() => setIsModalOpen(true)}
+        >
+          Delete
+        </button>
       </div>
-      <ConfirmationModal 
+      <ConfirmationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onConfirm={() => {

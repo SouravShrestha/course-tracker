@@ -61,3 +61,16 @@ code {
 .filter-secondary {
   filter: brightness(0) saturate(100%) invert(79%) sepia(3%) saturate(1210%) hue-rotate(174deg) brightness(77%) contrast(79%);
 }
+
+@keyframes center-animate {
+  0% {
+      width: 208px;
+  }
+  100% {
+      width: 250px;
+  }
+}
+
+.center {
+  animation: center-animate 1s ease infinite alternate;
+}

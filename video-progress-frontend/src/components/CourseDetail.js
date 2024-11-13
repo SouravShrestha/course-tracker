@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import LibraryExplorer from "./LibraryExplorer"; // Import your LibraryExplorer component
 import VideoPlayer from "./VideoPlayer"; // Import your VideoPlayer component
 
@@ -9,6 +9,8 @@ const CourseDetail = () => {
   const [selectedVideo, setSelectedVideo] = useState("");
   const [selectedVideoPath, setSelectedVideoPath] = useState("");
   const [videoProgress, setVideoProgress] = useState({});
+  const location = useLocation(); // Get the current location (URL)
+  const videoIdToPlay = new URLSearchParams(location.search).get("videoIdToPlay");
 
   const handleVideoClick = (video) => {
     setSelectedVideo(video);
@@ -55,6 +57,7 @@ const CourseDetail = () => {
           onVideoClick={handleVideoClick}
           videoProgress={videoProgress}
           activeVideoPath={selectedVideoPath}
+          videoIdToPlay={videoIdToPlay}
         />
       </div>
       <div className="w-p79 h-[calc(100vh-5rem)] overflow-y-auto">

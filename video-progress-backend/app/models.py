@@ -34,6 +34,7 @@ class Folder(Base):
     subfolders = relationship("Subfolder", back_populates="folder", cascade="all, delete-orphan")
     tags = relationship("Tag", secondary=folder_tags)
     __table_args__ = (UniqueConstraint('main_folder_id', 'name', name='uq_main_folder_name'),)
+    last_played_video = relationship("FolderLastPlayed", back_populates="folder", uselist=False)
 
 class Subfolder(Base):
     __tablename__ = "subfolders"
@@ -58,6 +59,19 @@ class Video(Base):
 def current_time_ist():
     return datetime.now(pytz.timezone('Asia/Kolkata'))
 
+class FolderLastPlayed(Base):
+    __tablename__ = "folder_last_played"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    folder_id = Column(Integer, ForeignKey("folders.id"))
+    video_id = Column(Integer, ForeignKey("videos.id"))
+    last_played_at = Column(DateTime, default=current_time_ist)
+
+    folder = relationship("Folder", back_populates="last_played_video")
+    video = relationship("Video")
+
+    __table_args__ = (UniqueConstraint('folder_id', name='uq_folder_last_played'),)
+
 class Note(Base):
     __tablename__ = "notes"
     id = Column(Integer, primary_key=True, index=True)
@@ -81,14 +95,6 @@ class TagSchema(BaseModel):
 
     class Config:
         orm_mode = True
-
-class FolderResponse(BaseModel):
-    id: int
-    name: str
-    main_folder_name: str
-    path: str
-    main_folder_path: str
-    tags: List[TagSchema] = []
 
 class NoteCreateSchema(BaseModel):
     video_id: int
@@ -124,6 +130,20 @@ class VideoSchema(BaseModel):
 
     class Config:
         orm_mode = True
+        from_attributes = True
+
+class FolderResponse(BaseModel):
+    id: int
+    name: str
+    main_folder_name: str
+    path: str
+    main_folder_path: str
+    tags: List[TagSchema] = []
+    last_played_video: Optional[VideoSchema]
+    last_played_at: Optional[datetime] 
+
+    class Config:
+        orm_mode = True
 
 class SubfolderSchema(BaseModel):
     id: int
@@ -132,3 +152,14 @@ class SubfolderSchema(BaseModel):
 
     class Config:
         orm_mode = True
+
+class FolderLastPlayedSchema(BaseModel):
+    folder_id: int
+    video_id: int
+    last_played_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class UpdateLastPlayedRequest(BaseModel):
+    video_id: int

@@ -32,6 +32,25 @@ const TagManager = ({ isOpen, onClose, refreshTags }) => {
     };
   }, [isOpen]);
 
+  // Effect to handle Escape key press for closing the modal
+  useEffect(() => {
+    const handleEscapeKey = (event) => {
+      if (event.key === "Escape") {
+        onClose(); // Close the modal when Escape is pressed
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscapeKey); // Add event listener
+    } else {
+      document.removeEventListener("keydown", handleEscapeKey); // Clean up when modal is closed
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscapeKey); // Clean up the event listener on unmount
+    };
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (isOpen) {
       const loadFolders = async () => {

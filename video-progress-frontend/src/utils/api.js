@@ -30,6 +30,22 @@ export const scanFolder = async (folder) => {
   return await handleResponse(response);
 };
 
+export const getFolderById = async (folderId) => {
+  try {
+    const response = await fetch(`${BASE_URL}/folders/${folderId}`);
+    
+    if (!response.ok) {
+      throw new Error("Failed to fetch folder by ID");
+    }
+
+    const folderData = await response.json();
+    return folderData;
+  } catch (error) {
+    console.error("Error fetching folder by ID:", error);
+    throw error; // Rethrow the error for handling elsewhere
+  }
+};
+
 export const checkFolderExists = async (path) => {
   const response = await fetch(
     `${BASE_URL}/folder-exists/?folder_path=${encodeURIComponent(path)}`

@@ -1,8 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import CourseCard from "./CourseCard";
+import CourseCardTiny from "./CourseCardTiny";
 import Popup from "./Popup";
 import loadingGif from "../assets/images/loading.gif";
-import { scanFolder, checkFolderExists, getTagsOfFolder } from "../utils/api";
+import {
+  scanFolder,
+  checkFolderExists,
+  getTagsOfFolder,
+  getFolderById,
+} from "../utils/api";
 import { fetchStoredFolders } from "../utils/folderUtils";
 import { getRandomColorPair } from "../utils/colorUtils";
 import Tag from "./Tag";
@@ -13,10 +19,16 @@ import folderIcon from "../assets/images/folder-settings.png";
 import newFolderIcon from "../assets/images/add-folder.png";
 import starIcon from "../assets/images/star.png";
 import sleepIcon from "../assets/images/sleep.png";
+import searchIcon from "../assets/images/search.png";
+import slashIcon from "../assets/images/slash.png";
+import downIcon from "../assets/images/down.png";
+import closeIcon from "../assets/images/close.png";
+import folderIconPlain from "../assets/images/folder.png";
 
 const HomePage = () => {
   const [scannedMainFolders, setScannedMainFolders] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
+  const [topRecentCourses, setTopRecentCourses] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [validPaths, setValidPaths] = useState({});
@@ -28,6 +40,8 @@ const HomePage = () => {
   const firstRenderRef = useRef(true); // Use a ref to track first render
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Reference to the dropdown menu
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
 
   const scanFolders = async () => {
     const storedMainFolders = fetchStoredFolders();
@@ -83,6 +97,30 @@ const HomePage = () => {
     }
   };
 
+  useEffect(() => {
+    if (scannedMainFolders.length > 0) {
+      // Flatten all folders into a single array of courses
+      const allCourses = scannedMainFolders.flatMap(
+        (mainFolder) => mainFolder.folders
+      );
+
+      // Filter out courses where last_played_at is null
+      const filteredCourses = allCourses.filter(
+        (course) => course.last_played_at !== null
+      );
+
+      // Sort courses by last_played_at in descending order (most recent first)
+      const sortedCourses = filteredCourses.sort(
+        (a, b) => new Date(b.last_played_at) - new Date(a.last_played_at)
+      );
+
+      // Get the top 4 most recent courses
+      const top4Courses = sortedCourses.slice(0, 4);
+      // Update the state with top 4 courses
+      setTopRecentCourses(top4Courses);
+    }
+  }, [scannedMainFolders]); // Runs whenever scannedMainFolders changes
+
   // Step 1: get the stored filterTags on render
   useEffect(() => {
     const storedFilterTags = JSON.parse(localStorage.getItem("filterTags"));
@@ -94,7 +132,7 @@ const HomePage = () => {
 
   // Step 2: update the tags only after loading filterTags
   useEffect(() => {
-    if(filterTags){
+    if (filterTags) {
       updateTags();
     }
   }, [filterTags]);
@@ -130,7 +168,7 @@ const HomePage = () => {
 
   useEffect(() => {
     // Filter courses based on filterTags
-    setFilteredCourses([])
+    setFilteredCourses([]);
     scannedMainFolders.map((folder) => {
       // Filter the courses in the current folder
       const filteredCourses =
@@ -141,7 +179,7 @@ const HomePage = () => {
               )
             )
           : folder.folders;
-      setFilteredCourses(filteredCourses)
+      setFilteredCourses(filteredCourses);
       localStorage.setItem("filterTags", JSON.stringify(filterTags));
     });
   }, [filterTags, scannedMainFolders]);
@@ -160,7 +198,7 @@ const HomePage = () => {
           };
         });
       setTags(updatedTags);
-      if(folderId){
+      if (folderId) {
         refreshCourseTags(folderId);
       }
     } catch (error) {
@@ -241,7 +279,7 @@ const HomePage = () => {
     setTags((prevTags) => {
       return prevTags.filter((t) => t.id !== tag.id);
     });
-  }
+  };
 
   const removeFromFilter = (tag) => {
     setFilterTags((prevTags) => {
@@ -254,12 +292,25 @@ const HomePage = () => {
       }
       return [...prevTags, tag]; // Otherwise, add it to the filterTags
     });
-  }
+  };
 
-  // Close dropdown when clicking outside
+  // Search filter for courses
+  const filteredBySearchQuery = (courses) => {
+    if (!searchQuery) return courses;
+    return courses.filter((course) =>
+      course.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Close settings dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && !event.target.closest(".dropdown-toggle")) {
         setDropdownOpen(false);
       }
     };
@@ -272,27 +323,173 @@ const HomePage = () => {
 
   return (
     <div className="p-4 px-6">
-      <div className="absolute right-5 top-5">
-        {/* Settings button (Dropdown menu) */}
-        <button
-          className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center group"
-          onClick={toggleDropdown}
-        >
-          <img
-            src={settingsIcon}
-            alt="Settings"
-            className="h-6 aspect-auto cursor-pointer group-hover:filter-primary filter-secondary"
-          />
-          <span className="ml-1.5 font-meidum text-sm text-colortextsecondary group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-gradientEnd group-hover:to-gradientStart bg-clip-text">
-            Manage
-          </span>
-        </button>
+      <div className="absolute right-32 top-0 flex space-x-6 items-center">
+        <form onSubmit={""} className="flex space-x-0 relative flex-col">
+          <div className="relative w-full h-20 flex items-center max-h-20">
+            <input
+              type="text"
+              className="w-72 py-1.5 bg-primary sm:text-sm sm:leading-6 border-colorborder border px-6 pl-10 pr-10 rounded-md focus:outline-none focus:ring-1 focus:ring-white placeholder:text-colortextsecondary ease transform origin-right duration-100 focus:w-100 placeholder:opacity-85"
+              placeholder="Search content here..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+            />
+            {/* Left Icon (search icon) */}
+            <div className="absolute left-3 top-1/2 pointer-events-none transform -translate-y-1/2">
+              <img
+                src={searchIcon} // Replace with actual search icon
+                alt="Search Icon"
+                className={`w-4 h-4 ${
+                  isFocused ? "filter-white" : "filter-disabled"
+                }`}
+              />
+            </div>
+            {/* Right Icon (clear icon) */}
+            <div className="absolute right-0.5 top-1/2 transform -translate-y-1/2">
+              <img
+                src={isFocused ? closeIcon : slashIcon} // Replace with actual search icon
+                alt="Slash Icon"
+                className={`p-0.5 w-5 h-5 mr-2 ${
+                  isFocused
+                    ? "filter-disabled cursor-pointer hover:filter-white"
+                    : "filter-disabled pointer-events-none"
+                }`}
+              />
+            </div>
+          </div>
+          {isFocused && (
+            <div className="flex text-xs text-colortext bg-primarydark w-full p-4 border-colorborder border -mt-3 rounded-md flex-col space-y-3">
+              <div>
+                <div className="font-semibold">Searching for</div>
+                <div className="flex mt-3 space-x-3 mb-1">
+                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
+                    <div className="cursor-default">
+                      <span className="text-blue-500 mr-2">ⵌ</span>
+                      <span>Tags</span>
+                    </div>
+                    <img
+                      src={closeIcon}
+                      alt="Close Icon"
+                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
+                    />
+                  </span>
+                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
+                    <div className="cursor-default flex items-center">
+                      <img src={folderIconPlain} className="w-3 h-3 mr-2" />
+                      <span>Folder</span>
+                    </div>
+                    <img
+                      src={closeIcon}
+                      alt="Close Icon"
+                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
+                    />
+                  </span>
+                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
+                    <div className="cursor-default">
+                      <span className="mr-2 text-xxs">🎥</span>
+                      <span>Content</span>
+                    </div>
+                    <img
+                      src={closeIcon}
+                      alt="Close Icon"
+                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
+                    />
+                  </span>
+                </div>
+              </div>
+
+              <hr className="border-0.5 border-colorborder"/>
+
+              <div>
+                <div>
+                  <span className="text-blue-500 mr-1 text-sm font-medium">
+                    ⵌ
+                  </span>
+                  <span className="font-semibold">Tags</span>
+                </div>
+                <div className="flex mt-1.5">
+                  <Tag text={"design"} color={getTagColor(1)} />
+                  <Tag text={"design-patterns"} color={getTagColor(3)} />
+                </div>
+              </div>
+
+              <hr className="border-0.5 border-colorborder"/>
+
+              <div>
+                <div className="font-semibold flex justify-between">
+                  <div className="flex">
+                    <img src={folderIconPlain} className="w-3.5 h-3.5 mr-1.5" />
+                    Folder paths
+                  </div>
+                  <div className="text-xxs hover:text-blue-600 font-normal text-colortextsecondary cursor-pointer">
+                    Show all
+                  </div>
+                </div>
+                <div className="flex mt-1.5 flex-col">
+                  <div className="mt-2 font-mono hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md">
+                    📂 /users/kavita/personal/courses/Graphics <span className="text-colorSuccess font-medium">Design</span>
+                  </div>
+                  <div className="mt-2 font-mono hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md">
+                    📂 /users/kavita/personal/courses/
+                    <span className="text-colorSuccess font-medium">
+                      Design
+                    </span>{" "}
+                    Patterns
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-0.5 border-colorborder"/>
+
+              <div>
+                <div className="cursor-default font-semibold flex justify-between">
+                  <div className="flex">
+                    <span className="mr-1 text-xxs">🎥</span>
+                    <span>Content</span>
+                  </div>
+
+                  <div className="text-xxs hover:text-blue-600 font-normal text-colortextsecondary cursor-pointer">
+                    Show all
+                  </div>
+                </div>
+                <div className="flex mt-1.5 flex-col">
+                  <div className="mt-2 hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md text-xs">
+                    <span className="mr-2">🎬</span>
+                    <span className="text-colorSuccess font-medium">Design</span> pattern.mp4
+                  </div>
+                  <div className="mt-2 hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md text-xs">
+                    <span className="mr-2">🎬</span>
+                    Netwok <span className="text-colorSuccess font-medium">design</span>ing.mp4
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </form>
+      </div>
+
+      {/* Settings button (Dropdown menu) */}
+      <div
+        className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center group dropdown-toggle cursor-pointer absolute right-5 top-0 h-20 "
+        onClick={toggleDropdown}
+      >
+        <span className="ml-1.5 font-medium text-sm text-colortextsecondary group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-gradientEnd group-hover:to-gradientStart bg-clip-text">
+          Manage
+        </span>
+        <img
+          src={downIcon}
+          alt="Settings"
+          className={`h-6 aspect-auto cursor-pointer group-hover:filter-primary filter-secondary mt-1 ml-0.5 transition-transform duration-100 ease-in-out ${
+            dropdownOpen ? "rotate-180 mb-1" : ""
+          }`}
+        />
 
         {/* Dropdown Menu */}
         {dropdownOpen && (
           <div
             ref={dropdownRef}
-            className="absolute right-0 mt-2 bg-primarydark shadow-sm rounded-sm w-52 py-2 border border-colorborder z-20"
+            className="absolute top-1 -right-2 mt-16 bg-primarydark shadow-sm rounded-sm w-52 py-2 border border-colorborder z-20"
           >
             <button
               onClick={() => {
@@ -338,9 +535,33 @@ const HomePage = () => {
         refreshTags={refreshTags}
       />
 
+      {/* Render recents */}
+      {topRecentCourses && topRecentCourses.length > 0 && (
+        <div className="mb-6">
+          <div className="font-semibold text-lg mb-3">
+            Continue where you left off <span className="ml-1.5">🏰</span>
+          </div>
+          <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 mb-5">
+            {topRecentCourses.map((course) =>
+              validPaths[course.id] ? (
+                <CourseCardTiny
+                  key={course.id}
+                  course={course}
+                  courseColor={getFolderColor(course.id)}
+                />
+              ) : null
+            )}
+          </div>
+        </div>
+      )}
+
+      {filteredCourses.length > 0 && (
+        <div className="font-semibold text-lg mb-3">Your collection</div>
+      )}
+
       {/* Horizontal list of active tags */}
       {filterTags?.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-2 items-start min-h-10">
+        <div className="flex flex-wrap gap-2 items-start min-h-10 mb-2">
           <div className="w-7">
             <img
               src={starIcon}
@@ -362,7 +583,7 @@ const HomePage = () => {
 
       {/* Horizontal list of inactive tags */}
       {tags?.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6 mt-3 min-h-10">
+        <div className="flex flex-wrap gap-2 mb-3 min-h-10">
           <div className="w-7">
             <img
               src={sleepIcon}
@@ -384,7 +605,7 @@ const HomePage = () => {
 
       {/* Render Courses */}
       {filteredCourses.length > 0 ? (
-        <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 mt-4">
+        <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
           {filteredCourses.map((course) =>
             validPaths[course.id] ? (
               <CourseCard
