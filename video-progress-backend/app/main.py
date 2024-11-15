@@ -1,10 +1,10 @@
 import glob
 import os
 from typing import List, Optional
-from fastapi import Body, FastAPI, Depends, HTTPException
+from fastapi import Body, FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, aliased
 from app.database import SessionLocal, engine
 from app.models import Base, FolderLastPlayed, FolderLastPlayedSchema, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, TagCreateSchema, UpdateLastPlayedRequest, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, VideoSchema, current_time_ist, folder_tags
 from app.utils import scan_folder
@@ -193,7 +193,7 @@ def get_folders(path: Optional[str] = None, db: Session = Depends(get_db)):
             main_folder_name=folder.main_folder.name,
             path=os.path.join(folder.main_folder.path, folder.name),
             main_folder_path=folder.main_folder.path,
-            tags=folder.tags,
+            tags=[{"id": tag.id, "name": tag.name} for tag in folder.tags],
             last_played_video=(
                 VideoSchema.from_orm(folder.last_played_video.video) if folder.last_played_video else None
             ),
@@ -330,8 +330,13 @@ def update_note(note_id: int, note: NoteSchema, db: Session = Depends(get_db)):
     return existing_note
 
 @app.get("/api/tags", response_model=List[TagSchema])
-def get_tags(db: Session = Depends(get_db)):
-    tags = db.query(Tag).order_by(Tag.name).all() # Assuming Tag is defined in your models
+def search_tags(query: str = Query(None), db: Session = Depends(get_db)):
+    # Query tags based on the provided query parameter
+    if query:
+        print(query)
+        tags = db.query(Tag).filter(Tag.name.ilike(f"%{query}%")).order_by(Tag.name).all()
+    else:
+        tags = db.query(Tag).order_by(Tag.name).all()  # Return all tags if no query
     return tags
 
 @app.post("/api/tags", response_model=TagSchema)
@@ -460,3 +465,39 @@ def get_last_played_video(folder_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Last played video not found for this folder")
     
     return last_played
+
+@app.get("/api/folder", response_model=List[dict])
+def search_folders(query: str = Query(None), db: Session = Depends(get_db)):
+    # Create an alias for MainFolder to select its path explicitly
+    main_folder_alias = aliased(MainFolder)
+    
+    # Query folders with a proper alias for MainFolder to include its path
+    if query:
+        print(query)  # Optional: log the query for debugging purposes
+        folders = db.query(Folder.id, Folder.name, main_folder_alias.path).\
+            join(main_folder_alias, Folder.main_folder_id == main_folder_alias.id).\
+            filter(Folder.name.ilike(f"%{query}%")).order_by(Folder.name).all()
+    else:
+        folders = db.query(Folder.id, Folder.name, main_folder_alias.path).\
+            join(main_folder_alias, Folder.main_folder_id == main_folder_alias.id).\
+            order_by(Folder.name).all()  # Return all folders if no query
+    
+    # Return the result as a list of dictionaries with id, name, and main_folder path
+    return [{"id": folder.id, "name": folder.name, "path": os.path.join(folder.path, folder.name)} for folder in folders]
+
+@app.get("/api/video", response_model=List[dict])
+def search_videos(query: str = Query(None), db: Session = Depends(get_db)):
+    if query:
+        # Search for videos by name using a case-insensitive search, and join Subfolder to get folder_id
+        videos = db.query(Video.id, Video.name, Subfolder.folder_id).\
+            join(Subfolder, Subfolder.id == Video.subfolder_id).\
+            filter(Video.name.ilike(f"%{query}%")).\
+            order_by(Video.name).all()
+    else:
+        # If no query is provided, return all videos with folder_id
+        videos = db.query(Video.id, Video.name, Subfolder.folder_id).\
+            join(Subfolder, Subfolder.id == Video.subfolder_id).\
+            order_by(Video.name).all()
+
+    # Return a list of dictionaries containing the video id, name, and folder_id
+    return [{"id": video.id, "name": video.name, "folder_id": video.folder_id} for video in videos]

@@ -18,6 +18,42 @@ export const fetchCourses = async (storedFolders) => {
     .sort((a, b) => a.name.localeCompare(b.name));
 };
 
+export const fetchFolders = async (inputValue) => {
+  try {
+    // Send the pathPattern as part of the query string
+    const response = await fetch(`${BASE_URL}/folder?query=${encodeURIComponent(inputValue)}`);
+    
+    // Check if the response is okay (status 200)
+    if (!response.ok) {
+      throw new Error("Failed to fetch folders by path pattern");
+    }
+    
+    // Parse and return the JSON response
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching folders by path-like pattern:', error);
+    throw error;  // Rethrow the error for handling elsewhere
+  }
+};
+
+export const fetchVideos = async (inputValue) => {
+  try {
+    // Send the search query (inputValue) as part of the query string
+    const response = await fetch(`${BASE_URL}/video?query=${encodeURIComponent(inputValue)}`);
+    
+    // Check if the response is okay (status 200)
+    if (!response.ok) {
+      throw new Error("Failed to fetch videos by name");
+    }
+    
+    // Parse and return the JSON response
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching videos by name pattern:', error);
+    throw error;  // Rethrow the error for handling elsewhere
+  }
+};
+
 export const scanFolder = async (folder) => {
   const response = await fetch(`${BASE_URL}/folders/scan`, {
     method: "POST",
@@ -78,12 +114,17 @@ export const updateVideoProgressB = async (videoId, progress) => {
   }
 };
 
-export const fetchTags = async () => {
-  const response = await fetch(`${BASE_URL}/tags`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch tags");
+export const fetchTags = async (query = '') => {
+  try {
+    const response = await fetch(`${BASE_URL}/tags?query=${encodeURIComponent(query)}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch tags");
+    }
+    return await response.json();  // Return the list of tags
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    throw error;  // Rethrow the error to handle it in the calling component
   }
-  return await response.json();
 };
 
 export const fetchFoldersByPath = async (path) => {

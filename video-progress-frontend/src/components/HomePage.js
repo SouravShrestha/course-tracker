@@ -7,23 +7,18 @@ import {
   scanFolder,
   checkFolderExists,
   getTagsOfFolder,
-  getFolderById,
 } from "../utils/api";
 import { fetchStoredFolders } from "../utils/folderUtils";
 import { getRandomColorPair } from "../utils/colorUtils";
 import Tag from "./Tag";
 import { fetchTags } from "../utils/api";
 import TagManager from "./TagManager";
-import settingsIcon from "../assets/images/settings.png";
 import folderIcon from "../assets/images/folder-settings.png";
 import newFolderIcon from "../assets/images/add-folder.png";
 import starIcon from "../assets/images/star.png";
 import sleepIcon from "../assets/images/sleep.png";
-import searchIcon from "../assets/images/search.png";
-import slashIcon from "../assets/images/slash.png";
 import downIcon from "../assets/images/down.png";
-import closeIcon from "../assets/images/close.png";
-import folderIconPlain from "../assets/images/folder.png";
+import Search from "./Search";
 
 const HomePage = () => {
   const [scannedMainFolders, setScannedMainFolders] = useState([]);
@@ -40,8 +35,6 @@ const HomePage = () => {
   const firstRenderRef = useRef(true); // Use a ref to track first render
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Reference to the dropdown menu
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
 
   const scanFolders = async () => {
     const storedMainFolders = fetchStoredFolders();
@@ -183,6 +176,7 @@ const HomePage = () => {
       localStorage.setItem("filterTags", JSON.stringify(filterTags));
     });
   }, [filterTags, scannedMainFolders]);
+  
 
   const updateTags = async (folderId) => {
     try {
@@ -294,19 +288,6 @@ const HomePage = () => {
     });
   };
 
-  // Search filter for courses
-  const filteredBySearchQuery = (courses) => {
-    if (!searchQuery) return courses;
-    return courses.filter((course) =>
-      course.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  };
-
-  // Handle search input change
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-  };
-
   // Close settings dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -323,151 +304,7 @@ const HomePage = () => {
 
   return (
     <div className="p-4 px-6">
-      <div className="absolute right-32 top-0 flex space-x-6 items-center">
-        <form onSubmit={""} className="flex space-x-0 relative flex-col">
-          <div className="relative w-full h-20 flex items-center max-h-20">
-            <input
-              type="text"
-              className="w-72 py-1.5 bg-primary sm:text-sm sm:leading-6 border-colorborder border px-6 pl-10 pr-10 rounded-md focus:outline-none focus:ring-1 focus:ring-white placeholder:text-colortextsecondary ease transform origin-right duration-100 focus:w-100 placeholder:opacity-85"
-              placeholder="Search content here..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-            />
-            {/* Left Icon (search icon) */}
-            <div className="absolute left-3 top-1/2 pointer-events-none transform -translate-y-1/2">
-              <img
-                src={searchIcon} // Replace with actual search icon
-                alt="Search Icon"
-                className={`w-4 h-4 ${
-                  isFocused ? "filter-white" : "filter-disabled"
-                }`}
-              />
-            </div>
-            {/* Right Icon (clear icon) */}
-            <div className="absolute right-0.5 top-1/2 transform -translate-y-1/2">
-              <img
-                src={isFocused ? closeIcon : slashIcon} // Replace with actual search icon
-                alt="Slash Icon"
-                className={`p-0.5 w-5 h-5 mr-2 ${
-                  isFocused
-                    ? "filter-disabled cursor-pointer hover:filter-white"
-                    : "filter-disabled pointer-events-none"
-                }`}
-              />
-            </div>
-          </div>
-          {isFocused && (
-            <div className="flex text-xs text-colortext bg-primarydark w-full p-4 border-colorborder border -mt-3 rounded-md flex-col space-y-3">
-              <div>
-                <div className="font-semibold">Searching for</div>
-                <div className="flex mt-3 space-x-3 mb-1">
-                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
-                    <div className="cursor-default">
-                      <span className="text-blue-500 mr-2">ⵌ</span>
-                      <span>Tags</span>
-                    </div>
-                    <img
-                      src={closeIcon}
-                      alt="Close Icon"
-                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
-                    />
-                  </span>
-                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
-                    <div className="cursor-default flex items-center">
-                      <img src={folderIconPlain} className="w-3 h-3 mr-2" />
-                      <span>Folder</span>
-                    </div>
-                    <img
-                      src={closeIcon}
-                      alt="Close Icon"
-                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
-                    />
-                  </span>
-                  <span className="flex items-center bg-colorsecondary py-1.5 pl-3.5 pr-2.5 rounded-full font-medium">
-                    <div className="cursor-default">
-                      <span className="mr-2 text-xxs">🎥</span>
-                      <span>Content</span>
-                    </div>
-                    <img
-                      src={closeIcon}
-                      alt="Close Icon"
-                      className="ml-4 w-3.5 h-3.5 filter-secondary hover:filter-white cursor-pointer"
-                    />
-                  </span>
-                </div>
-              </div>
-
-              <hr className="border-0.5 border-colorborder"/>
-
-              <div>
-                <div>
-                  <span className="text-blue-500 mr-1 text-sm font-medium">
-                    ⵌ
-                  </span>
-                  <span className="font-semibold">Tags</span>
-                </div>
-                <div className="flex mt-1.5">
-                  <Tag text={"design"} color={getTagColor(1)} />
-                  <Tag text={"design-patterns"} color={getTagColor(3)} />
-                </div>
-              </div>
-
-              <hr className="border-0.5 border-colorborder"/>
-
-              <div>
-                <div className="font-semibold flex justify-between">
-                  <div className="flex">
-                    <img src={folderIconPlain} className="w-3.5 h-3.5 mr-1.5" />
-                    Folder paths
-                  </div>
-                  <div className="text-xxs hover:text-blue-600 font-normal text-colortextsecondary cursor-pointer">
-                    Show all
-                  </div>
-                </div>
-                <div className="flex mt-1.5 flex-col">
-                  <div className="mt-2 font-mono hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md">
-                    📂 /users/kavita/personal/courses/Graphics <span className="text-colorSuccess font-medium">Design</span>
-                  </div>
-                  <div className="mt-2 font-mono hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md">
-                    📂 /users/kavita/personal/courses/
-                    <span className="text-colorSuccess font-medium">
-                      Design
-                    </span>{" "}
-                    Patterns
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-0.5 border-colorborder"/>
-
-              <div>
-                <div className="cursor-default font-semibold flex justify-between">
-                  <div className="flex">
-                    <span className="mr-1 text-xxs">🎥</span>
-                    <span>Content</span>
-                  </div>
-
-                  <div className="text-xxs hover:text-blue-600 font-normal text-colortextsecondary cursor-pointer">
-                    Show all
-                  </div>
-                </div>
-                <div className="flex mt-1.5 flex-col">
-                  <div className="mt-2 hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md text-xs">
-                    <span className="mr-2">🎬</span>
-                    <span className="text-colorSuccess font-medium">Design</span> pattern.mp4
-                  </div>
-                  <div className="mt-2 hover:bg-colorsecondary w-full py-2 px-3 cursor-pointer rounded-md text-xs">
-                    <span className="mr-2">🎬</span>
-                    Netwok <span className="text-colorSuccess font-medium">design</span>ing.mp4
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </form>
-      </div>
+      <Search />
 
       {/* Settings button (Dropdown menu) */}
       <div
