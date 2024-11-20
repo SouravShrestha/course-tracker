@@ -162,7 +162,7 @@ const LibraryExplorer = ({
                 className="flex items-center pb-3 dropdown-toggle"
                 onClick={(e) => handleChapterClick(e)}
               >
-                <span className="mr-3 flex items-center justify-center w-7 h-7 rounded-sm bg-gradient-to-r from-gradientEnd to-gradientStart text-white font-semibold dropdown-toggle">
+                <span className="mr-3 flex items-center justify-center w-7 h-7 rounded-sm bg-gradient-to-r from-gradientEnd to-gradientStart text-white font-semibold dropdown-toggle min-w-7">
                   {index + 1}
                 </span>
                 <span className="chapter">
