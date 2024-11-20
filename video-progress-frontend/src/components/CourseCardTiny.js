@@ -71,7 +71,7 @@ const CourseCardTiny = ({ course, courseColor }) => {
             : "Never Played"}
         </div>
         <div className="flex justify-between items-baseline">
-          <span className="text-sm text-colortextsecondary -mt-1.5 max-w-4/5 truncate">
+          <span className="text-sm text-colortextsecondary -mt-1.5 max-w-3/5 truncate">
             {course.name}
           </span>
           <span className="text-xxs text-colortextsecondary -mt-1.5">

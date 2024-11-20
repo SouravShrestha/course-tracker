@@ -23,7 +23,7 @@ const CourseCard = ({ course, courseColor }) => {
       className="my-1 flex flex-col justify-between hover:bg-primarydark transition ease-in-out duration-200 cursor-pointer relative rounded-md"
       onClick={handleClick}
     >
-      <TextCard word={course.name} color={courseColor}/>
+      <TextCard word={course.name} color={courseColor} />
       <div className="p-4 border border-colorborder rounded-md rounded-t-none border-t-0 flex-grow">
         <div className="w-full relative">
           <h3 className="text-lg mb-0 font-semibold max-w-4/5 overflow-x-hidden">
@@ -65,7 +65,7 @@ const CourseCard = ({ course, courseColor }) => {
         </div>
 
         {/* Progress bar */}
-        <div className="relative w-full h-1 bg-colorsecondary rounded-md">
+        <div className="relative w-full h-1 bg-colorsecondary rounded-md mt-3">
           <div
             className={`h-1 absolute rounded-md`}
             style={{
@@ -88,11 +88,13 @@ const CourseCard = ({ course, courseColor }) => {
             />
           )}
         </div>
-        <div className="flex mt-6 flex-wrap">
-          {course.tags.map((tag, index) => (
-            <Tag key={index} text={tag.name} color={tag.color}/>
-          ))}
-        </div>
+        { course.tags && course.tags.length > 0 &&
+          <div className="flex mt-6 flex-wrap">
+            {course.tags.map((tag, index) => (
+              <Tag key={index} text={tag.name} color={tag.color} />
+            ))}
+          </div>
+        }
       </div>
     </div>
   );

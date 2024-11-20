@@ -284,7 +284,7 @@ def update_video(video_id: int, request: UpdateVideoRequest, db: Session = Depen
                 video_id=video.id,
                 last_played_at=current_time_ist()  # Set current timestamp for the first time the video is played
             )
-            db.merge(last_played)
+            db.merge(new_last_played)
 
         # Commit the changes to the FolderLastPlayed table
         db.commit()

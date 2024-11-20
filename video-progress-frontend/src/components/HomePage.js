@@ -19,6 +19,7 @@ import starIcon from "../assets/images/star.png";
 import sleepIcon from "../assets/images/sleep.png";
 import downIcon from "../assets/images/down.png";
 import Search from "./Search";
+import Masonry, {ResponsiveMasonry} from "react-responsive-masonry";
 
 const HomePage = () => {
   const [scannedMainFolders, setScannedMainFolders] = useState([]);
@@ -83,6 +84,7 @@ const HomePage = () => {
           [...prevCourses]
         );
       });
+
     } catch (error) {
       console.error(error.message);
     } finally {
@@ -120,6 +122,9 @@ const HomePage = () => {
     if (storedFilterTags) {
       storedFilterTags.map((tag) => (tag.color = getTagColor(tag.id)));
       setFilterTags(storedFilterTags);
+    }
+    else{
+      setFilterTags([])
     }
   }, []);
 
@@ -442,16 +447,22 @@ const HomePage = () => {
 
       {/* Render Courses */}
       {filteredCourses.length > 0 ? (
-        <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10">
-          {filteredCourses.map((course) =>
-            validPaths[course.id] ? (
-              <CourseCard
-                key={course.id}
-                course={course}
-                courseColor={getFolderColor(course.id)}
-              />
-            ) : null
-          )}
+        <div className="course-list">
+          <ResponsiveMasonry
+            columnsCountBreakPoints={{ 350: 2, 750: 3, 900: 4 }}
+          >
+            <Masonry gutter="1.5rem" sequential={true}>
+              {filteredCourses.map((course) =>
+                validPaths[course.id] ? (
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    courseColor={getFolderColor(course.id)}
+                  />
+                ) : null
+              )}
+            </Masonry>
+          </ResponsiveMasonry>
         </div>
       ) : (
         !loading && (

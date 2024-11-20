@@ -7,7 +7,7 @@ const TextCardTiny = ({ word, index, color }) => {
   }
 
   // Trim the word and split it into an array of words
-  const words = word.trim().split(' ');
+  const words = word.replace(/[^a-zA-Z]/g, '').trim().split(' ');
 
   let displayText;
 
