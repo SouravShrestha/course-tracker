@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { checkFolderExists } from "../utils/api";
+import { addMainFolder, checkFolderExists } from "../utils/api";
 import newFolderIcon from "../assets/images/add-folder.png";
 
 const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
@@ -35,7 +35,7 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
     e.preventDefault();
     if (!folderPath.trim()) return;
     try {
-      const exists = await checkFolderExists(folderPath);
+      const exists = await addMainFolder(folderPath);
       if (exists) {
         const storedFolders = JSON.parse(localStorage.getItem("folders")) || [];
         if (!storedFolders.includes(folderPath)) {
@@ -45,6 +45,7 @@ const Popup = ({ isOpen, onClose, onFoldersUpdate }) => {
           setErrorMessage("");
           setMessage("🎉 Folder added successfully!");
           onFoldersUpdate();
+          onClose();
         } else {
           setMessage("");
           setErrorMessage("🚨 This folder is already in the list.");

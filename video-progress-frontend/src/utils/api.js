@@ -54,17 +54,55 @@ export const fetchVideos = async (inputValue) => {
   }
 };
 
-export const scanFolder = async (folder) => {
+export const addMainFolder = async (folder) => {
+  const response = await fetch(`${BASE_URL}/mainfolders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ path: folder }),
+  });
+
+
+  if (!response.ok){
+    if(response.status == 404){
+      return "Success";
+    }else{
+      throw new Error("🚫 Invalid path entered. Enter the full folder path.");
+    }
+  }
+
+  return await handleResponse(response);
+};
+
+export const scanMainFolder = async (folder) => {
+  const response = await fetch(`${BASE_URL}/mainfolders/scan`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ path: folder }),
+  });
+
+  return await handleResponse(response);
+};
+
+export const scanFolder = async (folderPath) => {
   const response = await fetch(`${BASE_URL}/folders/scan`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ main_folder_path: folder }),
+    body: JSON.stringify({ folder_path: folderPath }),
   });
 
-  return await handleResponse(response);
+  if (!response.ok) {
+    throw new Error(`Failed to scan folders: ${response.statusText}`);
+  }
+
+  return await response.json();
 };
+
 
 export const getFolderById = async (folderId) => {
   try {

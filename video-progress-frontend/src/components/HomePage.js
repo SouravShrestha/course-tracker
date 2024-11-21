@@ -4,9 +4,10 @@ import CourseCardTiny from "./CourseCardTiny";
 import Popup from "./Popup";
 import loadingGif from "../assets/images/loading.gif";
 import {
-  scanFolder,
+  scanMainFolder,
   checkFolderExists,
   getTagsOfFolder,
+  scanFolder
 } from "../utils/api";
 import { fetchStoredFolders } from "../utils/folderUtils";
 import { getRandomColorPair } from "../utils/colorUtils";
@@ -19,12 +20,13 @@ import starIcon from "../assets/images/star.png";
 import sleepIcon from "../assets/images/sleep.png";
 import downIcon from "../assets/images/down.png";
 import Search from "./Search";
-import Masonry, {ResponsiveMasonry} from "react-responsive-masonry";
+import Masonry from 'react-masonry-css'
 
 const HomePage = () => {
-  const [scannedMainFolders, setScannedMainFolders] = useState([]);
+  const [scannedFolders, setScannedFolders] = useState(null);
+  const [foldersToScan, setFoldersToScan] = useState(null);
   const [filteredCourses, setFilteredCourses] = useState([]);
-  const [topRecentCourses, setTopRecentCourses] = useState(null);
+  const [topRecentFolders, setTopRecentFolders] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [validPaths, setValidPaths] = useState({});
@@ -36,85 +38,91 @@ const HomePage = () => {
   const firstRenderRef = useRef(true); // Use a ref to track first render
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Reference to the dropdown menu
+  let completedScan = [];
 
   const scanFolders = async () => {
     const storedMainFolders = fetchStoredFolders();
     if (storedMainFolders.length === 0) {
-      setScannedMainFolders([]);
+      setScannedFolders([]);
       return;
     }
 
     setLoading(true);
 
     try {
+
       const scanResponses = await Promise.all(
-        storedMainFolders.map(scanFolder)
+        storedMainFolders.map(scanMainFolder)
       );
 
-      scanResponses.forEach((response) => {
-        // Iterate over each folder in the current response
-        response.folders.forEach((folder) => {
-          // Iterate over each tag in the current folder
-          folder.tags = folder.tags.map((tag) => {
-            const color = getTagColor(tag.id);
-            // Return the updated tag with the color property
-            return {
-              ...tag, // Spread the current tag properties
-              color: color, // Set the color using getTagColor
-            };
-          });
-        });
-      });
-
-      setScannedMainFolders((prevCourses) => {
-        const existingIds = new Set(prevCourses.map((course) => course.id));
-
-        return scanResponses.reduce(
-          (acc, scanResponse) => {
-            if (!existingIds.has(scanResponse.id)) {
-              acc.push({
-                id: scanResponse.id,
-                name: scanResponse.name,
-                main_folder_path: scanResponse.path,
-                folders: scanResponse.folders,
-              });
-            }
-            return acc;
-          },
-          [...prevCourses]
-        );
-      });
-
+      const flatFolders = scanResponses.flatMap((response) => 
+        response.map((folder) => {
+          // Add the color property to each tag in the folder
+          folder.tags = folder.tags.map((tag) => ({
+            ...tag,
+            color: getTagColor(tag.id), // Get the color for each tag
+          }));
+          return folder; // Return the updated folder
+        })
+      );
+      completedScan = [];
+      setFoldersToScan(flatFolders);
     } catch (error) {
       console.error(error.message);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (scannedMainFolders.length > 0) {
-      // Flatten all folders into a single array of courses
-      const allCourses = scannedMainFolders.flatMap(
-        (mainFolder) => mainFolder.folders
-      );
+    const scanAllFolders = async () => {
+      if (foldersToScan && foldersToScan.length > 0) {
+        setScannedFolders(null)
+        let scannedCount = 0;
+        for (const folder of foldersToScan) {
+          if (!completedScan.includes(folder.path)) {
+            try {
+              const temp = await scanFolder(folder.path);
 
+              temp.tags = temp.tags.map((tag) => ({
+                ...tag,
+                color: getTagColor(tag.id), // Get the color for each tag
+              }));
+
+              completedScan.push(folder.path);  // Add the folder path to the completed scan
+              setScannedFolders((prev) => [...(prev || []), temp]);
+              scannedCount += 1;
+              const progress = Math.round((scannedCount / foldersToScan.length) * 100);
+
+            } catch (error) {
+              // Ignore the error or log it if you need
+              console.warn(`Error scanning folder ${folder.path}:`, error);
+            }
+          }
+        }
+      }
+      setLoading(false);
+    };
+
+    scanAllFolders();
+  }, [foldersToScan]);  
+  
+  useEffect(() => {
+    if (scannedFolders) {
       // Filter out courses where last_played_at is null
-      const filteredCourses = allCourses.filter(
-        (course) => course.last_played_at !== null
+      const filteredFolders = scannedFolders.filter(
+        (folder) => folder.last_played_at !== null
       );
 
       // Sort courses by last_played_at in descending order (most recent first)
-      const sortedCourses = filteredCourses.sort(
+      const sortedFolders = filteredFolders.sort(
         (a, b) => new Date(b.last_played_at) - new Date(a.last_played_at)
       );
 
       // Get the top 4 most recent courses
-      const top4Courses = sortedCourses.slice(0, 4);
+      const top4Folders = sortedFolders.slice(0, 4);
       // Update the state with top 4 courses
-      setTopRecentCourses(top4Courses);
+      setTopRecentFolders(top4Folders);
     }
-  }, [scannedMainFolders]); // Runs whenever scannedMainFolders changes
+  }, [scannedFolders]); // Runs whenever scannedFolders changes
 
   // Step 1: get the stored filterTags on render
   useEffect(() => {
@@ -144,12 +152,10 @@ const HomePage = () => {
 
   useEffect(() => {
     const validatePaths = async () => {
-      const validationPromises = scannedMainFolders.flatMap((mainFolder) =>
-        mainFolder.folders.map(async (course) => {
-          const exists = await checkFolderExists(course.path);
-          return { id: course.id, exists };
-        })
-      );
+      const validationPromises = scannedFolders.map(async (course) => {
+        const exists = await checkFolderExists(course.path);
+        return { id: course.id, exists };
+      });
 
       const results = await Promise.all(validationPromises);
       const validationResults = Object.fromEntries(
@@ -159,29 +165,27 @@ const HomePage = () => {
       setValidPaths(validationResults);
     };
 
-    if (scannedMainFolders.length > 0) {
+    if (scannedFolders && scannedFolders.length > 0) {
       validatePaths();
     }
-  }, [scannedMainFolders]);
+  }, [scannedFolders]);
 
   useEffect(() => {
-    // Filter courses based on filterTags
-    setFilteredCourses([]);
-    scannedMainFolders.map((folder) => {
-      // Filter the courses in the current folder
+    if(scannedFolders){
+      // Filter courses based on filterTags
+      setFilteredCourses([]);
       const filteredCourses =
         filterTags.length > 0
-          ? folder.folders.filter((course) =>
-              course.tags.some((courseTag) =>
-                filterTags.some((filterTag) => filterTag.id === courseTag.id)
+          ? scannedFolders.filter((folder) =>
+              folder.tags.some((folderTag) =>
+                filterTags.some((filterTag) => filterTag.id === folderTag.id)
               )
             )
-          : folder.folders;
+          : scannedFolders;
       setFilteredCourses(filteredCourses);
       localStorage.setItem("filterTags", JSON.stringify(filterTags));
-    });
-  }, [filterTags, scannedMainFolders]);
-  
+    }
+  }, [filterTags, scannedFolders]);
 
   const updateTags = async (folderId) => {
     try {
@@ -221,17 +225,14 @@ const HomePage = () => {
         };
       });
 
-      // Update the specific course's tags in scannedMainFolders
-      setScannedMainFolders((prevFolders) =>
-        prevFolders.map((scannedFolder) => ({
-          ...scannedFolder,
-          folders: scannedFolder.folders.map(
-            (course) =>
-              course.id === folderId
-                ? { ...course, tags: updatedTags } // Update the tags for this course
-                : course // Return the course as is if it doesn't match
-          ),
-        }))
+      // Update the specific course's tags in scannedFolder
+      setScannedFolders((prevFolders) =>
+        prevFolders.map(
+          (course) =>
+            course.id === folderId
+              ? { ...course, tags: updatedTags } // Update the tags for this course
+              : course // Return the course as is if it doesn't match
+        )
       );
     } catch (error) {
       console.error("Error refreshing course tags:", error);
@@ -308,12 +309,12 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="p-4 px-6">
+    <div className="p-4 px-6 pb-0">
       <Search />
 
       {/* Settings button (Dropdown menu) */}
       <div
-        className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center group dropdown-toggle cursor-pointer absolute right-5 top-0 h-20 "
+        className="py-1.5 transition-transform duration-150 ease-in-out hover:scale-105 flex items-center group dropdown-toggle cursor-pointer absolute right-5 top-0 h-20"
         onClick={toggleDropdown}
       >
         <span className="ml-1.5 font-medium text-sm text-colortextsecondary group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-gradientEnd group-hover:to-gradientStart bg-clip-text">
@@ -331,7 +332,7 @@ const HomePage = () => {
         {dropdownOpen && (
           <div
             ref={dropdownRef}
-            className="absolute top-1 -right-2 mt-16 bg-primarydark shadow-sm rounded-sm w-52 py-2 border border-colorborder z-20"
+            className="absolute top-1 -right-2 mt-16 bg-primarydark shadow-sm rounded-sm w-52 py-2 border border-colorborder z-50"
           >
             <button
               onClick={() => {
@@ -378,13 +379,13 @@ const HomePage = () => {
       />
 
       {/* Render recents */}
-      {topRecentCourses && topRecentCourses.length > 0 && (
+      {topRecentFolders && topRecentFolders.length > 0 && (
         <div className="mb-6">
           <div className="font-semibold text-lg mb-3">
             Continue where you left off <span className="ml-1.5">🏰</span>
           </div>
-          <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-10 mb-5">
-            {topRecentCourses.map((course) =>
+          <div className="course-list grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-5">
+            {topRecentFolders.map((course) =>
               validPaths[course.id] ? (
                 <CourseCardTiny
                   key={course.id}
@@ -447,36 +448,41 @@ const HomePage = () => {
 
       {/* Render Courses */}
       {filteredCourses.length > 0 ? (
-        <div className="course-list">
-          <ResponsiveMasonry
-            columnsCountBreakPoints={{ 350: 2, 750: 3, 900: 4 }}
-          >
-            <Masonry gutter="1.5rem" sequential={true}>
-              {filteredCourses.map((course) =>
-                validPaths[course.id] ? (
-                  <CourseCard
-                    key={course.id}
-                    course={course}
-                    courseColor={getFolderColor(course.id)}
-                  />
-                ) : null
-              )}
-            </Masonry>
-          </ResponsiveMasonry>
-        </div>
+        <Masonry
+          breakpointCols={4}
+          className="my-masonry-grid"
+          columnClassName="my-masonry-grid_column"
+        >
+          {filteredCourses.map((course) =>
+            validPaths[course.id] ? (
+              <CourseCard
+                key={course.id}
+                course={course}
+                courseColor={getFolderColor(course.id)}
+              />
+            ) : null
+          )}
+        </Masonry>
       ) : (
         !loading && (
-          <p className="mt-5 text-sm text-colortextsecondary">
-            🥺 No courses available. Try adding a new folder.
-          </p>
+          <div className="flex flex-col items-left space-y-4">
+            <span className="text-sm text-colortextsecondary">🥺 No content available. Try adding a new folder.</span>
+          </div>
         )
       )}
 
       {loading && (
         <div className="fixed bottom-6 right-6 z-30 py-1.5 px-3 bg-primarydark text-white rounded-lg shadow-md border border-colorborder flex items-center space-x-2">
           <img src={loadingGif} alt="Loading..." className="w-6 h-6" />
-          <span className="text-sm">Scanning folders for changes</span>
+          <span className="text-sm">
+            Scanning folders for changes ⏳ Loading {scannedFolders?.length + 1}{" "}
+            of {foldersToScan?.length}
+          </span>
         </div>
+      )}
+
+      {loading && (
+        <div className="w-full h-1 loading-bar fixed top-0 left-0 gradient-loader select-none z-20"></div>
       )}
     </div>
   );

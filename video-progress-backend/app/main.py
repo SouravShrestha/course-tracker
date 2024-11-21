@@ -1,14 +1,16 @@
 import glob
+import json
 import os
+from sqlite3 import IntegrityError
+import subprocess
 from typing import List, Optional
 from fastapi import Body, FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload, aliased
 from app.database import SessionLocal, engine
-from app.models import Base, FolderLastPlayed, FolderLastPlayedSchema, FolderScanRequest, MainFolder, Folder, Subfolder, SubfolderSchema, TagCreateSchema, UpdateLastPlayedRequest, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, VideoSchema, current_time_ist, folder_tags
-from app.utils import scan_folder
-from moviepy.editor import VideoFileClip
+from app.models import Base, FolderLastPlayed, FolderLastPlayedSchema, FolderScanRequest, MainFolder, Folder, MainFolderRequest, Subfolder, SubfolderSchema, TagCreateSchema, UpdateLastPlayedRequest, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, VideoSchema, current_time_ist, folder_tags
+from pymediainfo import MediaInfo
 
 app = FastAPI()
 
@@ -80,94 +82,206 @@ def clean_up_db(session: Session):
     # Commit the changes after the cleanup
     session.commit()
 
-@app.post("/api/folders/scan", response_model=dict)
-def scan_and_insert_folder_structure(request: FolderScanRequest, db: Session = Depends(get_db)):
-    main_folder_path = request.main_folder_path
-    if not os.path.exists(main_folder_path):
-        raise HTTPException(status_code=400, detail="Folder path does not exist.")
+@app.post("/api/mainfolders", response_model=dict)
+def add_main_folder(request: MainFolderRequest, db: Session = Depends(get_db)):
+    # Check if a folder with the same path already exists
+    if db.query(MainFolder).filter_by(path=request.path).first():
+        raise HTTPException(
+            status_code=404, detail="A MainFolder with this path already exists."
+        )
 
-    main_folder = db.query(MainFolder).filter_by(path=main_folder_path).first()
-    if not main_folder:
-        main_folder = MainFolder(name=os.path.basename(main_folder_path), path=main_folder_path)
-        db.add(main_folder)
-        db.commit()
-        db.refresh(main_folder)
+    # Validate that the provided path exists
+    if not os.path.exists(request.path):
+        raise HTTPException(
+            status_code=400, detail="The specified folder path does not exist."
+        )
 
-    folder_structure = scan_folder(main_folder_path)
-    for folder in folder_structure:
-        folder_obj = db.query(Folder).filter_by(name=folder['name'], main_folder_id=main_folder.id).first() or Folder(main_folder_id=main_folder.id, name=folder['name'])
-        
-        db.add(folder_obj)
-        db.commit()
-        db.refresh(folder_obj)
+    folder_name = os.path.basename(request.path)
 
-        for subfolder in folder['subfolders']:
-            subfolder_obj = db.query(Subfolder).filter_by(name=subfolder['name'], folder_id=folder_obj.id).first() or Subfolder(folder_id=folder_obj.id, name=subfolder['name'])
-            db.add(subfolder_obj)
-            db.commit()
-            db.refresh(subfolder_obj)
-
-            for video in subfolder['videos']:
-                if not db.query(Video).filter_by(path=video['path']).first():
-                    try:
-                        with VideoFileClip(video['path']) as clip:
-                            duration = convert_seconds_to_hhmmss(clip.duration)
-                    except Exception as e:
-                        print(f"Error processing video '{video['name']}': {e}")
-                        duration = "00:00"
-
-                    new_video = Video(subfolder_id=subfolder_obj.id, name=video['name'], path=video['path'], progress=0.0, duration=duration)
-                    db.add(new_video)
-
+    # Create and insert the new MainFolder
+    new_main_folder = MainFolder(name=folder_name, path=request.path)
+    db.add(new_main_folder)
     db.commit()
-    clean_up_db(session=db)
-    
-    # Prepare the comprehensive response
-    response = {
-        "id": main_folder.id,
-        "name": main_folder.name,
-        "path": main_folder.path,
-        "folders": [
-            {
-                "id": folder_obj.id,
-                "name": folder_obj.name,
-                "path": os.path.join(main_folder.path, folder_obj.name),
-                "subfolders": [
-                    {
-                        "id": subfolder_obj.id,
-                        "name": subfolder_obj.name,
-                        "videos": [
-                            {
-                                "id": video.id,
-                                "name": video.name,
-                                "path": video.path,
-                                "progress": video.progress,
-                                "duration": video.duration
-                            }
-                            for video in subfolder_obj.videos
-                        ]
-                    }
-                    for subfolder_obj in folder_obj.subfolders
-                ],
+    db.refresh(new_main_folder)
+
+    return {
+        "id": new_main_folder.id,
+        "name": new_main_folder.name,
+        "path": new_main_folder.path,
+    }
+
+@app.post("/api/mainfolders/scan", response_model=list)
+def scan_all_main_folders(db: Session = Depends(get_db)):
+    # Fetch all main folders from the database
+    main_folders = db.query(MainFolder).all()
+    updated_folders = []  # To store the list of updated or created folders
+
+    for main_folder in main_folders:
+        # Check if the folder path exists
+        if not os.path.exists(main_folder.path):
+            print(f"Path does not exist: {main_folder.path}")
+            continue
+
+        # Scan the folder for subfolders
+        try:
+            subfolders = [f.name for f in os.scandir(main_folder.path) if f.is_dir()]
+        except Exception as e:
+            print(f"Error scanning {main_folder.path}: {e}")
+            continue
+
+        for subfolder_name in subfolders:
+            # Check if the folder already exists in the database
+            folder = (
+                db.query(Folder)
+                .filter_by(main_folder_id=main_folder.id, name=subfolder_name)
+                .first()
+            )
+            if not folder:
+                # Create a new Folder entry
+                folder = Folder(main_folder_id=main_folder.id, name=subfolder_name)
+                db.add(folder)
+                try:
+                    db.commit()
+                    db.refresh(folder)
+                except IntegrityError:
+                    db.rollback()
+                    print(f"IntegrityError: Could not insert folder '{subfolder_name}' for main folder {main_folder.name}.")
+                    continue
+                except Exception as e:
+                    db.rollback()
+                    print(f"Error adding folder '{subfolder_name}': {e}")
+                    continue
+
+            # Add folder details to the updated_folders list
+            updated_folders.append({
+                "id": folder.id,
+                "name": folder.name,
+                "main_folder_id": folder.main_folder_id,
+                "main_folder_name": main_folder.name,
+                "path": os.path.join(main_folder.path, folder.name),
                 "tags": [
-                {"id": tag.id, "name": tag.name} for tag in folder_obj.tags
+                {"id": tag.id, "name": tag.name} for tag in folder.tags
+                ]
+            })
+
+    print("Main folder scanning and folder table update complete.")
+    return updated_folders
+
+def get_video_metadata(video_path):
+    try:
+        media_info = MediaInfo.parse(video_path)
+        for track in media_info.tracks:
+            if track.track_type == "Video":
+                duration = track.duration / 1000 if track.duration else 0 
+                return convert_seconds_to_hhmmss(duration)
+    except Exception as e:
+        print(f"Error extracting metadata for {video_path}: {e}")
+        return "00:00"
+
+@app.post("/api/folders/scan", response_model=dict)
+def scan_folder_and_store(request: FolderScanRequest, db: Session = Depends(get_db)):
+    folder_path = request.folder_path
+
+    # Validate folder path existence
+    if not os.path.exists(folder_path):
+        raise HTTPException(status_code=400, detail="The specified folder path does not exist.")
+
+    # Validate if it is a directory
+    if not os.path.isdir(folder_path):
+        raise HTTPException(status_code=400, detail="The specified path is not a directory.")
+
+    folder_name = os.path.basename(folder_path)
+
+    # Check if folder exists in the database
+    folder = db.query(Folder).filter_by(name=folder_name).first()
+    if not folder:
+        folder = Folder(name=folder_name)
+        db.add(folder)
+        db.commit()
+        db.refresh(folder)
+
+    # Process subfolders
+    subfolders = [f for f in os.scandir(folder_path) if f.is_dir()]
+    for subfolder_entry in subfolders:
+        subfolder_name = subfolder_entry.name
+
+        # Check if subfolder exists
+        subfolder = db.query(Subfolder).filter_by(folder_id=folder.id, name=subfolder_name).first()
+        if not subfolder:
+            subfolder = Subfolder(folder_id=folder.id, name=subfolder_name)
+            db.add(subfolder)
+            db.commit()
+            db.refresh(subfolder)
+
+        # Process video files in the subfolder
+        video_files = [
+            v for v in os.scandir(subfolder_entry.path)
+            if v.is_file() and v.name.lower().endswith(('.mp4', '.mkv', '.avi'))
+        ]
+
+        for video_entry in video_files:
+            video_path = video_entry.path
+            video_name = video_entry.name
+
+            # Avoid duplicate video entries
+            if not db.query(Video).filter_by(path=video_path).first():
+                try:
+                    # Extract video metadata
+                    duration = get_video_metadata(video_path=video_path)
+                except Exception as e:
+                    print(f"Error processing video '{video_name}': {e}")
+                    duration = "00:00"
+
+                new_video = Video(
+                    subfolder_id=subfolder.id,
+                    name=video_name,
+                    path=video_path,
+                    duration=duration,
+                    progress=0.0,
+                )
+
+                if not db.query(Video).filter_by(path=video_path).first():
+                    db.add(new_video)
+                    db.commit()
+
+    # Prepare response
+    response = {
+        "id": folder.id,
+        "name": folder.name,
+        "path": folder_path,
+        "tags": [
+                {"id": tag.id, "name": tag.name} for tag in folder.tags
                 ],
                 "last_played_video": (
                     {
-                        "id": folder_obj.last_played_video.video.id,
-                        "name": folder_obj.last_played_video.video.name,
-                        "path": folder_obj.last_played_video.video.path,
-                        "progress": folder_obj.last_played_video.video.progress,
-                        "duration": folder_obj.last_played_video.video.duration
+                        "id": folder.last_played_video.video.id,
+                        "name": folder.last_played_video.video.name,
+                        "path": folder.last_played_video.video.path,
+                        "progress": folder.last_played_video.video.progress,
+                        "duration": folder.last_played_video.video.duration
                     }
-                    if folder_obj.last_played_video else None
+                    if folder.last_played_video else None
                 ),
-                "last_played_at": folder_obj.last_played_video.last_played_at if folder_obj.last_played_video else None 
+                "last_played_at": folder.last_played_video.last_played_at if folder.last_played_video else None,
+        "subfolders": [
+            {
+                "id": subfolder.id,
+                "name": subfolder.name,
+                "videos": [
+                    {
+                        "id": video.id,
+                        "name": video.name,
+                        "path": video.path,
+                        "progress": video.progress,
+                        "duration": video.duration,
+                    }
+                    for video in subfolder.videos
+                ],
             }
-            for folder_obj in main_folder.folders
-        ]
+            for subfolder in folder.subfolders
+        ],
     }
-    
+
     return response
 
 @app.get("/api/folders", response_model=List[FolderResponse])

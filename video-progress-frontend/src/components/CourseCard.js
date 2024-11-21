@@ -20,7 +20,7 @@ const CourseCard = ({ course, courseColor }) => {
 
   return (
     <div
-      className="my-1 flex flex-col justify-between hover:bg-primarydark transition ease-in-out duration-200 cursor-pointer relative rounded-md"
+      className="my-1 flex flex-col justify-between hover:bg-primarydark transition ease-in-out duration-200 cursor-pointer relative rounded-md mb-8" 
       onClick={handleClick}
     >
       <TextCard word={course.name} color={courseColor} />

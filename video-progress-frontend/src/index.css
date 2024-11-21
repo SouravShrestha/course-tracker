@@ -45,8 +45,8 @@ code {
   
 .gradient-loader {
   @apply bg-gradient-to-r from-accent via-purple-500 to-pink-500;
-  background-size: 200% 200%;
-  animation: gradiant-move 2s infinite;
+  background-size: 200% 100%;
+  animation: gradiant-move 1s infinite;
 }
 @keyframes gradiant-move { 
   0%{background-position:left; width: 0%;}
@@ -75,3 +75,18 @@ code {
   animation: center-animate 1s ease infinite alternate;
 }
 
+.dropdown-toggle {
+  z-index: 9999; /* Set a high z-index value */
+}
+
+.my-masonry-grid {
+  display: -webkit-box; /* Not needed if autoprefixing */
+  display: -ms-flexbox; /* Not needed if autoprefixing */
+  display: flex;
+  margin-left: -32px; /* gutter size offset */
+  width: auto;
+}
+.my-masonry-grid_column {
+  padding-left: 32px; /* gutter size */
+  background-clip: padding-box;
+}

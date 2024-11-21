@@ -163,3 +163,9 @@ class FolderLastPlayedSchema(BaseModel):
 
 class UpdateLastPlayedRequest(BaseModel):
     video_id: int
+
+class MainFolderRequest(BaseModel):
+    path: str = Field(..., min_length=1, max_length=1024)
+
+class FolderScanRequest(BaseModel):
+    folder_path: str = Field(..., min_length=1, max_length=1024)
