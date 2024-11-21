@@ -18,7 +18,7 @@ const CourseCardTiny = ({ course, courseColor }) => {
       const watchedTimeInSeconds = video.progress;
       const remainingTimeInSeconds = durationInSeconds - watchedTimeInSeconds;
 
-      return remainingTimeInSeconds;
+      return remainingTimeInSeconds < 0 ? 0 : remainingTimeInSeconds;
     }
     return 0; // No time left if no video data
   };
