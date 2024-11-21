@@ -103,6 +103,16 @@ export const scanFolder = async (folderPath) => {
   return await response.json();
 };
 
+export const fetchRecents = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}/last-played`);
+    return response.data;
+  } catch (error) {
+    console.error("Error checking folder last played:", error);
+    throw error;
+  }
+};
+
 
 export const getFolderById = async (folderId) => {
   try {

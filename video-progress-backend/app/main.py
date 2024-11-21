@@ -615,3 +615,13 @@ def search_videos(query: str = Query(None), db: Session = Depends(get_db)):
 
     # Return a list of dictionaries containing the video id, name, and folder_id
     return [{"id": video.id, "name": video.name, "folder_id": video.folder_id} for video in videos]
+
+@app.get("/api/last-played")
+def get_all_folder_ids(db: Session = Depends(get_db)):
+    # Query to get all distinct folder_ids from the FolderLastPlayed table
+    folder_ids = db.query(FolderLastPlayed.folder_id).distinct().all()
+    
+    # Extract folder_ids from the query result
+    folder_ids_list = [folder_id[0] for folder_id in folder_ids]
+    
+    return {"folder_ids": folder_ids_list}

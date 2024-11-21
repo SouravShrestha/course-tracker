@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import CourseCard from "./CourseCard";
 import CourseCardTiny from "./CourseCardTiny";
 import Popup from "./Popup";
@@ -7,7 +7,7 @@ import {
   scanMainFolder,
   checkFolderExists,
   getTagsOfFolder,
-  scanFolder
+  scanFolder,
 } from "../utils/api";
 import { fetchStoredFolders } from "../utils/folderUtils";
 import { getRandomColorPair } from "../utils/colorUtils";
@@ -20,13 +20,12 @@ import starIcon from "../assets/images/star.png";
 import sleepIcon from "../assets/images/sleep.png";
 import downIcon from "../assets/images/down.png";
 import Search from "./Search";
-import Masonry from 'react-masonry-css'
+import Masonry from "react-masonry-css";
 
 const HomePage = () => {
   const [scannedFolders, setScannedFolders] = useState(null);
   const [foldersToScan, setFoldersToScan] = useState(null);
   const [filteredCourses, setFilteredCourses] = useState([]);
-  const [topRecentFolders, setTopRecentFolders] = useState(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [validPaths, setValidPaths] = useState({});
@@ -38,7 +37,6 @@ const HomePage = () => {
   const firstRenderRef = useRef(true); // Use a ref to track first render
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null); // Reference to the dropdown menu
-  let completedScan = [];
 
   const scanFolders = async () => {
     const storedMainFolders = fetchStoredFolders();
@@ -47,15 +45,12 @@ const HomePage = () => {
       return;
     }
 
-    setLoading(true);
-
     try {
-
       const scanResponses = await Promise.all(
         storedMainFolders.map(scanMainFolder)
       );
 
-      const flatFolders = scanResponses.flatMap((response) => 
+      const flatFolders = scanResponses.flatMap((response) =>
         response.map((folder) => {
           // Add the color property to each tag in the folder
           folder.tags = folder.tags.map((tag) => ({
@@ -65,7 +60,6 @@ const HomePage = () => {
           return folder; // Return the updated folder
         })
       );
-      completedScan = [];
       setFoldersToScan(flatFolders);
     } catch (error) {
       console.error(error.message);
@@ -75,27 +69,20 @@ const HomePage = () => {
   useEffect(() => {
     const scanAllFolders = async () => {
       if (foldersToScan && foldersToScan.length > 0) {
-        setScannedFolders(null)
+        setScannedFolders(null);
         let scannedCount = 0;
         for (const folder of foldersToScan) {
-          if (!completedScan.includes(folder.path)) {
-            try {
-              const temp = await scanFolder(folder.path);
+          try {
+            const temp = await scanFolder(folder.path);
 
-              temp.tags = temp.tags.map((tag) => ({
-                ...tag,
-                color: getTagColor(tag.id), // Get the color for each tag
-              }));
-
-              completedScan.push(folder.path);  // Add the folder path to the completed scan
-              setScannedFolders((prev) => [...(prev || []), temp]);
-              scannedCount += 1;
-              const progress = Math.round((scannedCount / foldersToScan.length) * 100);
-
-            } catch (error) {
-              // Ignore the error or log it if you need
-              console.warn(`Error scanning folder ${folder.path}:`, error);
-            }
+            temp.tags = temp.tags.map((tag) => ({
+              ...tag,
+              color: getTagColor(tag.id), // Get the color for each tag
+            }));
+            setScannedFolders((prev) => [...(prev || []), temp]);
+          } catch (error) {
+            // Ignore the error or log it if you need
+            console.warn(`Error scanning folder ${folder.path}:`, error);
           }
         }
       }
@@ -103,36 +90,27 @@ const HomePage = () => {
     };
 
     scanAllFolders();
-  }, [foldersToScan]);  
+  }, [foldersToScan]);
+
+  const topRecentFolders = useMemo(() => {
+    if (!scannedFolders) return [];
   
-  useEffect(() => {
-    if (scannedFolders) {
-      // Filter out courses where last_played_at is null
-      const filteredFolders = scannedFolders.filter(
-        (folder) => folder.last_played_at !== null
-      );
-
-      // Sort courses by last_played_at in descending order (most recent first)
-      const sortedFolders = filteredFolders.sort(
-        (a, b) => new Date(b.last_played_at) - new Date(a.last_played_at)
-      );
-
-      // Get the top 4 most recent courses
-      const top4Folders = sortedFolders.slice(0, 4);
-      // Update the state with top 4 courses
-      setTopRecentFolders(top4Folders);
-    }
-  }, [scannedFolders]); // Runs whenever scannedFolders changes
+  // Filter, sort, and slice in one step
+  return scannedFolders
+    .filter((folder) => folder.last_played_at !== null)
+    .sort((a, b) => new Date(b.last_played_at) - new Date(a.last_played_at))
+    .slice(0, 4);
+  }, [scannedFolders]);
 
   // Step 1: get the stored filterTags on render
   useEffect(() => {
+    setLoading(true);
     const storedFilterTags = JSON.parse(localStorage.getItem("filterTags"));
     if (storedFilterTags) {
       storedFilterTags.map((tag) => (tag.color = getTagColor(tag.id)));
       setFilterTags(storedFilterTags);
-    }
-    else{
-      setFilterTags([])
+    } else {
+      setFilterTags([]);
     }
   }, []);
 
@@ -170,19 +148,21 @@ const HomePage = () => {
     }
   }, [scannedFolders]);
 
+
+  const filteredCourses_ = useMemo(() => 
+    filterTags?.length 
+      ? scannedFolders.filter(folder => 
+          folder.tags.some(folderTag => 
+            filterTags.some(filterTag => filterTag.id === folderTag.id)
+          )
+        ) 
+      : scannedFolders, 
+    [filterTags, scannedFolders]
+  );
+  
   useEffect(() => {
-    if(scannedFolders){
-      // Filter courses based on filterTags
-      setFilteredCourses([]);
-      const filteredCourses =
-        filterTags.length > 0
-          ? scannedFolders.filter((folder) =>
-              folder.tags.some((folderTag) =>
-                filterTags.some((filterTag) => filterTag.id === folderTag.id)
-              )
-            )
-          : scannedFolders;
-      setFilteredCourses(filteredCourses);
+    if (scannedFolders) {
+      setFilteredCourses(filteredCourses_);
       localStorage.setItem("filterTags", JSON.stringify(filterTags));
     }
   }, [filterTags, scannedFolders]);
@@ -297,7 +277,11 @@ const HomePage = () => {
   // Close settings dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && !event.target.closest(".dropdown-toggle")) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        !event.target.closest(".dropdown-toggle")
+      ) {
         setDropdownOpen(false);
       }
     };
@@ -403,7 +387,7 @@ const HomePage = () => {
       )}
 
       {/* Horizontal list of active tags */}
-      {filterTags?.length > 0 && (
+      {scannedFolders && filterTags?.length > 0 && (
         <div className="flex flex-wrap gap-2 items-start min-h-10 mb-2">
           <div className="w-7">
             <img
@@ -425,7 +409,7 @@ const HomePage = () => {
       )}
 
       {/* Horizontal list of inactive tags */}
-      {tags?.length > 0 && (
+      {scannedFolders && tags?.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3 min-h-10">
           <div className="w-7">
             <img
@@ -449,7 +433,13 @@ const HomePage = () => {
       {/* Render Courses */}
       {filteredCourses.length > 0 ? (
         <Masonry
-          breakpointCols={4}
+          breakpointCols={{
+            default: 4, // Large screens (e.g., desktops)
+            1200: 4, // Medium screens (e.g., smaller desktops)
+            992: 3, // Tablets
+            768: 2, // Smaller tablets or large phones
+            512: 1, // Mobile
+          }}
           className="my-masonry-grid"
           columnClassName="my-masonry-grid_column"
         >
@@ -466,7 +456,9 @@ const HomePage = () => {
       ) : (
         !loading && (
           <div className="flex flex-col items-left space-y-4">
-            <span className="text-sm text-colortextsecondary">🥺 No content available. Try adding a new folder.</span>
+            <span className="text-sm text-colortextsecondary">
+              🥺 No content available. Try adding a new folder.
+            </span>
           </div>
         )
       )}
@@ -475,7 +467,7 @@ const HomePage = () => {
         <div className="fixed bottom-6 right-6 z-30 py-1.5 px-3 bg-primarydark text-white rounded-lg shadow-md border border-colorborder flex items-center space-x-2">
           <img src={loadingGif} alt="Loading..." className="w-6 h-6" />
           <span className="text-sm">
-            Scanning folders for changes ⏳ Loading {scannedFolders?.length + 1}{" "}
+            Scanning folders for changes ⏳ Loading {scannedFolders ? scannedFolders?.length + 1 : 1}{" "}
             of {foldersToScan?.length}
           </span>
         </div>
