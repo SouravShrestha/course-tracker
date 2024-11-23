@@ -7,6 +7,7 @@ from typing import List, Optional
 from fastapi import Body, FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, aliased
 from app.database import SessionLocal, engine
 from app.models import Base, FolderLastPlayed, FolderLastPlayedSchema, FolderScanRequest, MainFolder, Folder, MainFolderRequest, Subfolder, SubfolderSchema, TagCreateSchema, UpdateLastPlayedRequest, Video, Note, NoteCreateSchema, NoteSchema, FolderResponse, UpdateVideoRequest, Tag, TagSchema, VideoSchema, current_time_ist, folder_tags
@@ -17,7 +18,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,10 +86,14 @@ def clean_up_db(session: Session):
 @app.post("/api/mainfolders", response_model=dict)
 def add_main_folder(request: MainFolderRequest, db: Session = Depends(get_db)):
     # Check if a folder with the same path already exists
-    if db.query(MainFolder).filter_by(path=request.path).first():
-        raise HTTPException(
-            status_code=404, detail="A MainFolder with this path already exists."
-        )
+    folder = db.query(MainFolder).filter(func.lower(MainFolder.path) == request.path.lower()).first()
+        
+    if folder:    
+        return {
+            "id": folder.id,
+            "name": folder.name,
+            "path": folder.path,
+        }
 
     # Validate that the provided path exists
     if not os.path.exists(request.path):
@@ -165,6 +170,7 @@ def scan_all_main_folders(db: Session = Depends(get_db)):
             })
 
     print("Main folder scanning and folder table update complete.")
+    clean_up_db(db)
     return updated_folders
 
 def get_video_metadata(video_path):
@@ -224,7 +230,7 @@ def scan_folder_and_store(request: FolderScanRequest, db: Session = Depends(get_
             video_name = video_entry.name
 
             # Avoid duplicate video entries
-            if not db.query(Video).filter_by(path=video_path).first():
+            if not db.query(Video).filter(func.lower(Video.path) == video_path.lower()).first():
                 try:
                     # Extract video metadata
                     duration = get_video_metadata(video_path=video_path)
@@ -240,9 +246,11 @@ def scan_folder_and_store(request: FolderScanRequest, db: Session = Depends(get_
                     progress=0.0,
                 )
 
-                if not db.query(Video).filter_by(path=video_path).first():
+                if not db.query(Video).filter(func.lower(Video.path) == video_path.lower()).first():
                     db.add(new_video)
                     db.commit()
+
+    last_video = folder.last_played_video.video if folder.last_played_video and folder.last_played_video.video else None
 
     # Prepare response
     response = {
@@ -252,17 +260,17 @@ def scan_folder_and_store(request: FolderScanRequest, db: Session = Depends(get_
         "tags": [
                 {"id": tag.id, "name": tag.name} for tag in folder.tags
                 ],
-                "last_played_video": (
-                    {
-                        "id": folder.last_played_video.video.id,
-                        "name": folder.last_played_video.video.name,
-                        "path": folder.last_played_video.video.path,
-                        "progress": folder.last_played_video.video.progress,
-                        "duration": folder.last_played_video.video.duration
-                    }
-                    if folder.last_played_video else None
-                ),
-                "last_played_at": folder.last_played_video.last_played_at if folder.last_played_video else None,
+        "last_played_video": (
+            {
+                "id": last_video.id if last_video else None,
+                "name": last_video.name if last_video else None,
+                "path": last_video.path if last_video else None,
+                "progress": last_video.progress if last_video else None,
+                "duration": last_video.duration if last_video else None,
+            }
+            if last_video else None
+        ),
+        "last_played_at": folder.last_played_video.last_played_at if folder.last_played_video else None,
         "subfolders": [
             {
                 "id": subfolder.id,
@@ -446,6 +454,7 @@ def update_note(note_id: int, note: NoteSchema, db: Session = Depends(get_db)):
 @app.get("/api/tags", response_model=List[TagSchema])
 def search_tags(query: str = Query(None), db: Session = Depends(get_db)):
     # Query tags based on the provided query parameter
+    tags = db.query(Tag).order_by(Tag.name).all()
     if query:
         print(query)
         tags = db.query(Tag).filter(Tag.name.ilike(f"%{query}%")).order_by(Tag.name).all()

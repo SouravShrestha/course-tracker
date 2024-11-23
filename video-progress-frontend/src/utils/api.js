@@ -1,12 +1,23 @@
 import axios from 'axios';
 
-const BASE_URL = "http://localhost:8000/api";
+export const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";  // Fallback to localhost if not set
+const BASE_URL = `${API_URL}/api`;
 
 const handleResponse = async (response) => {
   if (!response.ok) {
     throw new Error("Network response was not ok");
   }
   return await response.json();
+};
+
+export const fetchSubfolders = async (folderId) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/folders/${folderId}/subfolders`);
+    return response.data; // Return the fetched data
+  } catch (error) {
+    console.error("Error fetching subfolders:", error);
+    throw error; // Rethrow the error for handling
+  }
 };
 
 export const fetchCourses = async (storedFolders) => {

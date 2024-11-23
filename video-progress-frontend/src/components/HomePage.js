@@ -42,6 +42,7 @@ const HomePage = () => {
     const storedMainFolders = fetchStoredFolders();
     if (storedMainFolders.length === 0) {
       setScannedFolders([]);
+      setLoading(false);
       return;
     }
 
@@ -70,7 +71,6 @@ const HomePage = () => {
     const scanAllFolders = async () => {
       if (foldersToScan && foldersToScan.length > 0) {
         setScannedFolders(null);
-        let scannedCount = 0;
         for (const folder of foldersToScan) {
           try {
             const temp = await scanFolder(folder.path);
@@ -88,18 +88,16 @@ const HomePage = () => {
       }
       setLoading(false);
     };
-
     scanAllFolders();
   }, [foldersToScan]);
 
   const topRecentFolders = useMemo(() => {
     if (!scannedFolders) return [];
   
-  // Filter, sort, and slice in one step
-  return scannedFolders
-    .filter((folder) => folder.last_played_at !== null)
-    .sort((a, b) => new Date(b.last_played_at) - new Date(a.last_played_at))
-    .slice(0, 4);
+    // Filter, sort, and slice in one step
+    return scannedFolders?.filter((folder) => folder.last_played_at !== null)
+      .sort((a, b) => new Date(b.last_played_at) - new Date(a.last_played_at))
+      .slice(0, 4);
   }, [scannedFolders]);
 
   // Step 1: get the stored filterTags on render
@@ -151,7 +149,7 @@ const HomePage = () => {
 
   const filteredCourses_ = useMemo(() => 
     filterTags?.length 
-      ? scannedFolders.filter(folder => 
+      ? scannedFolders?.filter(folder => 
           folder.tags.some(folderTag => 
             filterTags.some(filterTag => filterTag.id === folderTag.id)
           )

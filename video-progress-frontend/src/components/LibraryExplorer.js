@@ -11,6 +11,7 @@ const LibraryExplorer = ({
   videoProgress,
   activeVideoPath,
   videoIdToPlay,
+  onDropdownVisibilityChange
 }) => {
   const [dropdownVisible, setDropdownVisible] = useState(false); // State to toggle dropdown visibility
   const contentRefs = useRef([]); // Ref to track content sections for scrolling
@@ -20,11 +21,13 @@ const LibraryExplorer = ({
 
   const handleContentClick = (index) => {
     setDropdownVisible(!dropdownVisible); // Toggle dropdown visibility
+    onDropdownVisibilityChange(!dropdownVisible);
     contentRefs.current[index].scrollIntoView({ behavior: "smooth" }); // Scroll to the selected content
   };
 
   const handleChapterClick = (event) => {
     setDropdownVisible(!dropdownVisible);
+    onDropdownVisibilityChange(!dropdownVisible);
     let clickedDiv = event.target;
     if (clickedDiv.tagName === "DIV") {
       // Get the clickedDiv's child span with class "chapter"
@@ -112,6 +115,7 @@ const LibraryExplorer = ({
       !event.target.closest(".dropdown-toggle")
     ) {
       setDropdownVisible(false);
+      onDropdownVisibilityChange(false);
     }
   };
 
@@ -128,7 +132,7 @@ const LibraryExplorer = ({
       {dropdownVisible && (
         <div
           ref={dropdownRef}
-          className="dropdown-list fixed z-20 text-base font-semibold mt-3 bg-primarydark border border-colorborder shadow-none -mx-3.5 w-1/5"
+          className="dropdown-list fixed z-20 text-base font-semibold mt-3 bg-primarydark border border-colorborder shadow-none -ml-4 w-1/5 max-h-96 overflow-y-scroll"
           style={{ top: `${dropdownPosition}px` }}
         >
           {contents.map((content, index) => (
@@ -153,11 +157,11 @@ const LibraryExplorer = ({
         .filter((content) => content.videos.length > 0)
         .map((content, index) => (
           <div
-            className="pb-2 relative mb-6"
+            className="pb-2 relative mb-6 z-0"
             key={content.id}
             ref={(el) => (contentRefs.current[index] = el)}
           >
-            <div className="text-base font-semibold cursor-pointer sticky top-0 overflow-hidden bg-primary -ml-1 pl-1 dropdown-toggle">
+            <div className="text-base font-semibold cursor-pointer sticky top-0 bg-primary -ml-1 pl-1 dropdown-toggle">
               <div
                 className="flex items-center pb-3 dropdown-toggle"
                 onClick={(e) => handleChapterClick(e)}
