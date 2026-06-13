@@ -2,9 +2,13 @@ import './globals.css';
 import Header from '@/components/Header';
 
 export const metadata = {
-  title: 'CourseTracker',
+  title: 'WeTrack - Video Course Tracker',
   description: 'Track your video course progress',
+  icons: {
+    icon: '/images/logo.png',
+  },
 };
+
 
 export default function RootLayout({ children }) {
   return (

@@ -9,7 +9,6 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-
 function getVideoDurationSync(videoPath) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -56,8 +55,19 @@ function cleanupMissing(db) {
       for (const sf of subs) {
         const sfPath = path.join(fPath, sf.name);
         if (!fs.existsSync(sfPath)) { db.prepare('DELETE FROM subfolders WHERE id = ?').run(sf.id); continue; }
-        const videos = db.prepare('SELECT id, path FROM videos WHERE subfolder_id = ?').all(sf.id);
-        for (const v of videos) {
+
+        const lessons = db.prepare('SELECT id, name FROM lessons WHERE subfolder_id = ?').all(sf.id);
+        for (const ls of lessons) {
+          const lsPath = path.join(sfPath, ls.name);
+          if (!fs.existsSync(lsPath)) { db.prepare('DELETE FROM lessons WHERE id = ?').run(ls.id); continue; }
+          const lessonVideos = db.prepare('SELECT id, path FROM videos WHERE lesson_id = ?').all(ls.id);
+          for (const v of lessonVideos) {
+            if (!fs.existsSync(v.path)) db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
+          }
+        }
+
+        const directVideos = db.prepare('SELECT id, path FROM videos WHERE subfolder_id = ? AND lesson_id IS NULL').all(sf.id);
+        for (const v of directVideos) {
           if (!fs.existsSync(v.path)) db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
         }
       }
@@ -83,6 +93,15 @@ function buildFolderResponse(db, folder, mainFolder) {
     last_played_video: lastPlayedVideo,
     last_played_at: lp?.last_played_at ?? null,
   };
+}
+
+function insertVideoIfMissing(db, videoPath, subfolderId, lessonId) {
+  const existing = db.prepare('SELECT id FROM videos WHERE LOWER(path) = LOWER(?)').get(videoPath);
+  if (!existing) {
+    const duration = getVideoDurationSync(videoPath);
+    db.prepare('INSERT OR IGNORE INTO videos (name, path, progress, duration, subfolder_id, lesson_id) VALUES (?, ?, 0.0, ?, ?, ?)')
+      .run(path.basename(videoPath), videoPath, duration, subfolderId, lessonId ?? null);
+  }
 }
 
 export function scanAllMainFolders() {
@@ -125,29 +144,51 @@ export function scanFolder(folderPath) {
     folder = { id: r.lastInsertRowid, name: folderName };
   }
 
-  const entries = fs.readdirSync(folderPath, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const sfPath = path.join(folderPath, entry.name);
-    let sf = db.prepare('SELECT id FROM subfolders WHERE folder_id = ? AND name = ?').get(folder.id, entry.name);
+  const chapterEntries = fs.readdirSync(folderPath, { withFileTypes: true }).filter(e => e.isDirectory());
+  for (const chapterEntry of chapterEntries) {
+    const chapterPath = path.join(folderPath, chapterEntry.name);
+    let sf = db.prepare('SELECT id FROM subfolders WHERE folder_id = ? AND name = ?').get(folder.id, chapterEntry.name);
     if (!sf) {
-      const r = db.prepare('INSERT OR IGNORE INTO subfolders (name, folder_id) VALUES (?, ?)').run(entry.name, folder.id);
+      const r = db.prepare('INSERT OR IGNORE INTO subfolders (name, folder_id) VALUES (?, ?)').run(chapterEntry.name, folder.id);
       sf = { id: r.lastInsertRowid };
     }
-    const videoFiles = fs.readdirSync(sfPath, { withFileTypes: true })
-      .filter(f => f.isFile() && VIDEO_EXTENSIONS.includes(path.extname(f.name).toLowerCase()));
-    for (const vf of videoFiles) {
-      const vPath = path.join(sfPath, vf.name);
-      const existing = db.prepare('SELECT id FROM videos WHERE LOWER(path) = LOWER(?)').get(vPath);
-      if (!existing) {
-        const duration = getVideoDurationSync(vPath);
-        db.prepare('INSERT OR IGNORE INTO videos (name, path, progress, duration, subfolder_id) VALUES (?, ?, 0.0, ?, ?)').run(vf.name, vPath, duration, sf.id);
+
+    const chapterChildren = fs.readdirSync(chapterPath, { withFileTypes: true });
+    const directVideos = chapterChildren.filter(f => f.isFile() && VIDEO_EXTENSIONS.includes(path.extname(f.name).toLowerCase()));
+    const lessonDirs = chapterChildren.filter(e => e.isDirectory());
+
+    if (directVideos.length > 0) {
+      // Pattern A: chapter contains videos directly
+      for (const vf of directVideos) {
+        insertVideoIfMissing(db, path.join(chapterPath, vf.name), sf.id, null);
+      }
+    } else {
+      // Pattern B: chapter contains lesson subdirectories
+      for (const lessonEntry of lessonDirs) {
+        const lessonPath = path.join(chapterPath, lessonEntry.name);
+        let ls = db.prepare('SELECT id FROM lessons WHERE subfolder_id = ? AND name = ?').get(sf.id, lessonEntry.name);
+        if (!ls) {
+          const r = db.prepare('INSERT OR IGNORE INTO lessons (name, subfolder_id) VALUES (?, ?)').run(lessonEntry.name, sf.id);
+          ls = { id: r.lastInsertRowid };
+        }
+        const lessonVideos = fs.readdirSync(lessonPath, { withFileTypes: true })
+          .filter(f => f.isFile() && VIDEO_EXTENSIONS.includes(path.extname(f.name).toLowerCase()));
+        for (const vf of lessonVideos) {
+          insertVideoIfMissing(db, path.join(lessonPath, vf.name), sf.id, ls.id);
+        }
       }
     }
   }
 
-  const subfolders = db.prepare('SELECT id, name FROM subfolders WHERE folder_id = ?').all(folder.id)
-    .map(sf => ({ ...sf, videos: db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE subfolder_id = ?').all(sf.id) }));
+  const subfolders = db.prepare('SELECT id, name FROM subfolders WHERE folder_id = ?').all(folder.id).map(sf => {
+    const lessons = db.prepare('SELECT id, name FROM lessons WHERE subfolder_id = ?').all(sf.id).map(ls => ({
+      ...ls,
+      videos: db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE lesson_id = ?').all(ls.id),
+    }));
+    const directVideos = db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE subfolder_id = ? AND lesson_id IS NULL').all(sf.id);
+    return { ...sf, lessons, videos: directVideos };
+  });
+
   const lp = db.prepare('SELECT video_id, last_played_at FROM folder_last_played WHERE folder_id = ?').get(folder.id);
   let lastPlayedVideo = null;
   if (lp?.video_id) lastPlayedVideo = db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE id = ?').get(lp.video_id);
@@ -182,12 +223,20 @@ export function search(query) {
 
 export function getSubfolders(folderId) {
   const db = getDb();
-  return db.prepare('SELECT id, name FROM subfolders WHERE folder_id = ?').all(folderId)
-    .map(sf => ({
-      ...sf,
-      videos: db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE subfolder_id = ?').all(sf.id)
+  return db.prepare('SELECT id, name FROM subfolders WHERE folder_id = ?').all(folderId).map(sf => {
+    const lessons = db.prepare('SELECT id, name FROM lessons WHERE subfolder_id = ?').all(sf.id).map(ls => ({
+      ...ls,
+      videos: db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE lesson_id = ?').all(ls.id)
         .map(v => ({ ...v, notes: db.prepare('SELECT * FROM notes WHERE video_id = ?').all(v.id) })),
     }));
+    const directVideos = db.prepare('SELECT id, name, path, progress, duration FROM videos WHERE subfolder_id = ? AND lesson_id IS NULL').all(sf.id)
+      .map(v => ({ ...v, notes: db.prepare('SELECT * FROM notes WHERE video_id = ?').all(v.id) }));
+    return { ...sf, lessons, videos: directVideos };
+  });
+}
+
+export function removeFolder(id) {
+  getDb().prepare('DELETE FROM folders WHERE id = ?').run(id);
 }
 
 export function updateLastPlayed(folderId, videoId) {

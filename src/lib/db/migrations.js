@@ -30,13 +30,21 @@ export function runMigrations(db) {
       UNIQUE(folder_id, name)
     );
 
+    CREATE TABLE IF NOT EXISTS lessons (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      name         TEXT NOT NULL,
+      subfolder_id INTEGER REFERENCES subfolders(id) ON DELETE CASCADE,
+      UNIQUE(subfolder_id, name)
+    );
+
     CREATE TABLE IF NOT EXISTS videos (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       name         TEXT NOT NULL,
       path         TEXT NOT NULL UNIQUE,
       progress     REAL DEFAULT 0.0,
       duration     TEXT,
-      subfolder_id INTEGER REFERENCES subfolders(id) ON DELETE CASCADE
+      subfolder_id INTEGER REFERENCES subfolders(id) ON DELETE CASCADE,
+      lesson_id    INTEGER REFERENCES lessons(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS folder_last_played (
@@ -54,4 +62,12 @@ export function runMigrations(db) {
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Incremental migrations for existing databases
+  const alterations = [
+    `ALTER TABLE videos ADD COLUMN lesson_id INTEGER REFERENCES lessons(id) ON DELETE CASCADE`,
+  ];
+  for (const sql of alterations) {
+    try { db.exec(sql); } catch { /* column already exists */ }
+  }
 }

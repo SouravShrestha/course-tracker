@@ -44,7 +44,13 @@ const CourseDetail = () => {
     setIsManualChange(false)
   };
 
-  const videoList = contents.flatMap((content) => content.videos || []);
+  const videoList = contents.flatMap((content) => {
+    if (content.lessons && content.lessons.length > 0) {
+      return content.lessons.flatMap(ls => ls.videos || []);
+    }
+    return content.videos || [];
+  });
+
   const currentIndex = videoList.findIndex(
     (video) => video.id === selectedVideo.id
   );

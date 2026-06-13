@@ -6,7 +6,7 @@ import fs from 'fs';
 function getDbPath() {
   const dataDir = path.join(os.homedir(), 'Library', 'Application Support', 'CourseTracker');
   fs.mkdirSync(dataDir, { recursive: true });
-  return path.join(dataDir, 'player_db.db');
+  return path.join(dataDir, 'we_track_db.db');
 }
 
 // Use a global singleton to survive Next.js HMR reloads in dev

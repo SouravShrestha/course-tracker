@@ -41,6 +41,7 @@ const HomePage = () => {
   const dropdownRef = useRef(null); // Reference to the dropdown menu
 
   const scanFolders = async () => {
+    setLoading(true);
     const storedMainFolders = await fetchStoredFolders();
     if (storedMainFolders.length === 0) {
       setScannedFolders([]);
@@ -49,30 +50,29 @@ const HomePage = () => {
     }
 
     try {
-      const scanResponses = await Promise.all(
-        storedMainFolders.map((f) => scanMainFolder(f.path))
-      );
+      const folders = await scanMainFolder();
 
-      const flatFolders = scanResponses.flatMap((response) =>
-        response.map((folder) => {
-          // Add the color property to each tag in the folder
-          folder.tags = folder.tags.map((tag) => ({
-            ...tag,
-            color: getTagColor(tag.id), // Get the color for each tag
-          }));
-          return folder; // Return the updated folder
-        })
-      );
+      const flatFolders = folders.map((folder) => {
+        folder.tags = folder.tags.map((tag) => ({
+          ...tag,
+          color: getTagColor(tag.id),
+        }));
+        return folder;
+      });
+
       flatFolders.sort((a, b) => {
-          if (a.name.toLowerCase() < b.name.toLowerCase()) return -1;
-          if (a.name.toLowerCase() > b.name.toLowerCase()) return 1;
-          return 0;
-        });
+        if (a.name.toLowerCase() < b.name.toLowerCase()) return -1;
+        if (a.name.toLowerCase() > b.name.toLowerCase()) return 1;
+        return 0;
+      });
       setFoldersToScan(flatFolders);
     } catch (error) {
       console.error(error.message);
+      setLoading(false);
     }
   };
+
+
 
   useEffect(() => {
     const scanAllFolders = async () => {
@@ -373,9 +373,11 @@ const HomePage = () => {
 
       <TagManager
         isOpen={isTagManagerOpen}
-        onClose={() => setIsTagManagerOpen(false)} // Close TagManager
+        onClose={() => setIsTagManagerOpen(false)}
         refreshTags={refreshTags}
+        onFolderRemoved={scanFolders}
       />
+
 
       {/* Render recents */}
       {topRecentFolders && topRecentFolders.length > 0 && (

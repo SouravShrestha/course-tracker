@@ -1,122 +1,67 @@
 'use client';
 import React, { useEffect, useState } from "react";
-import { fetchStoredFolders, getLastFolderName } from "../utils/folderUtils";
-import { fetchFoldersByPath, fetchTags, addTagToFolder, removeTagFromFolder, deleteUnmappedTags } from "../utils/api";
+import { fetchTags, addTagToFolder, removeTagFromFolder, removeMainFolder, fetchMainFolders } from "../utils/api";
 const folderImg = "/images/folder.png";
-const downImg = "/images/down.png";
 import Tag from "./Tag";
 import { getRandomColorPair } from "../utils/colorUtils";
 const folderIcon = "/images/folder-settings.png";
+const trashIcon = "/images/bin.png";
 
-const TagManager = ({ isOpen, onClose, refreshTags }) => {
-  const [folders, setFolders] = useState([]);
-  const [expandedFolder, setExpandedFolder] = useState(null);
-  const [subFolders, setSubFolders] = useState([]);
-  const [selectedSubFolder, setSelectedSubFolder] = useState(null);
+const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
+  const [courses, setCourses] = useState([]);
+  const [mainFolders, setMainFolders] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
   const [newTag, setNewTag] = useState("");
   const [unusedTags, setUnusedTags] = useState([]);
-  const [allTags, setAllTags] = useState([]); // Store all fetched tags
+  const [allTags, setAllTags] = useState([]);
+  const [confirmRemove, setConfirmRemove] = useState(null); // { item: mainFolder }
 
-  // Effect to handle body overflow when the modal is open
   useEffect(() => {
     if (isOpen) {
-      // Disable scrolling when modal is open
       document.body.style.overflow = 'hidden';
     } else {
-      // Restore scrolling when modal is closed
       document.body.style.overflow = 'auto';
     }
-
-    // Cleanup function to restore scroll on unmount or when modal closes
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
+    return () => { document.body.style.overflow = 'auto'; };
   }, [isOpen]);
 
-  // Effect to handle Escape key press for closing the modal
   useEffect(() => {
     const handleEscapeKey = (event) => {
-      if (event.key === "Escape") {
-        onClose(); // Close the modal when Escape is pressed
-      }
+      if (event.key === "Escape") onClose();
     };
-
     if (isOpen) {
-      document.addEventListener("keydown", handleEscapeKey); // Add event listener
+      document.addEventListener("keydown", handleEscapeKey);
     } else {
-      document.removeEventListener("keydown", handleEscapeKey); // Clean up when modal is closed
+      document.removeEventListener("keydown", handleEscapeKey);
     }
-
-    return () => {
-      document.removeEventListener("keydown", handleEscapeKey); // Clean up the event listener on unmount
-    };
+    return () => document.removeEventListener("keydown", handleEscapeKey);
   }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
-      const loadFolders = async () => {
-        const storedFolders = await fetchStoredFolders();
-        setFolders(storedFolders.map((f) => f.path));
-      };
-      loadFolders();
+      loadData();
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadTags();
-    }
-  }, [isOpen, selectedSubFolder]);
-
-  const loadTags = async () => {
-    const fetchedTags = await fetchTags();
-    setAllTags(
-      fetchedTags.map((tag) => ({
-        ...tag,
-        color: tag.color || getRandomColorPair(),
-      }))
-    );
-    if (selectedSubFolder) {
-      const unusedTags = fetchedTags.filter(
-        (tag) =>
-          !selectedSubFolder.tags.some(
-            (activeTag) => activeTag.name === tag.name
-          )
-      );
-      setUnusedTags(
-        unusedTags.map((tag) => ({
-          ...tag,
-          color: tag.color || getRandomColorPair(),
-        }))
-      );
-    }
+  const loadData = async () => {
+    const [allFolders, mf, fetchedTags] = await Promise.all([
+      fetch('/api/folders').then(r => r.json()),
+      fetchMainFolders(),
+      fetchTags(),
+    ]);
+    const tagsWithColor = fetchedTags.map(t => ({ ...t, color: getRandomColorPair() }));
+    setAllTags(tagsWithColor);
+    setMainFolders(mf);
+    setCourses(allFolders.map(f => ({
+      ...f,
+      tags: f.tags.map(t => ({ ...t, color: getRandomColorPair() })),
+    })));
   };
 
-  const handleSelectFolder = async (folder) => {
-    if (expandedFolder === folder) {
-      setExpandedFolder(null);
-      setSubFolders([]);
-      setSelectedSubFolder(null);
-    } else {
-      setExpandedFolder(folder);
-      const fetchedSubFolders = await fetchFoldersByPath(folder.path);
-      const subFoldersWithColor = fetchedSubFolders.map((subFolder) => ({
-        ...subFolder,
-        tags: subFolder.tags.map((tag) => ({
-          ...tag,
-          color: tag.color || getRandomColorPair(),
-        })),
-      }));
-      setSubFolders(subFoldersWithColor);
-    }
-  };
-
-  const handleSelectSubFolder = (subFolder) => {
-    setSelectedSubFolder(subFolder);
-    const updatedUnusedTags = allTags.filter(
-      (tag) => !subFolder.tags.some((activeTag) => activeTag.name === tag.name)
-    );
-    setUnusedTags(updatedUnusedTags);
+  const handleSelectCourse = (course) => {
+    setSelectedCourse(course);
+    const unused = allTags.filter(t => !course.tags.some(ct => ct.name === t.name));
+    setUnusedTags(unused);
   };
 
   const handleAddTag = async (e) => {
@@ -125,185 +70,146 @@ const TagManager = ({ isOpen, onClose, refreshTags }) => {
   };
 
   const addTag = async (tagName) => {
-    if (tagName.trim() && selectedSubFolder) {
-      const updatedTag = await addTagToFolder(
-        selectedSubFolder.id,
-        tagName.trim().toLowerCase()
-      );
+    if (!tagName.trim() || !selectedCourse) return;
+    const updatedTag = await addTagToFolder(selectedCourse.id, tagName.trim().toLowerCase());
+    const tagWithColor = { ...updatedTag, color: getRandomColorPair() };
 
-      const tagWithColor = {
-        ...updatedTag,
-        color: getRandomColorPair(),
-      };
-
-      selectedSubFolder.tags.push(tagWithColor);
-      setSelectedSubFolder(selectedSubFolder);
-
-      // Update allTags with the new tag
-      setAllTags((prevTags) => [...prevTags, tagWithColor]);
-
-      // Update unused tags based on the newly updated selectedSubFolder
-      const updatedUnusedTags = allTags.filter(
-        (tag) =>
-          ![...selectedSubFolder.tags, tagWithColor].some(
-            (activeTag) => activeTag.name === tag.name
-          )
-      );
-      setUnusedTags(updatedUnusedTags);
-
-      setNewTag(""); // Clear the input
-      refreshTags(selectedSubFolder.id);
-    }
-  }
+    const updatedCourse = { ...selectedCourse, tags: [...selectedCourse.tags, tagWithColor] };
+    setSelectedCourse(updatedCourse);
+    setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+    setAllTags(prev => prev.some(t => t.name === tagWithColor.name) ? prev : [...prev, tagWithColor]);
+    setUnusedTags(prev => prev.filter(t => t.name !== tagWithColor.name));
+    setNewTag("");
+    refreshTags(selectedCourse.id);
+  };
 
   const removeTag = async (tag) => {
-    if (tag.name.trim() && selectedSubFolder) {
-      await removeTagFromFolder(selectedSubFolder.id, tag.name);
-      
-      const indexToRemove = selectedSubFolder.tags.findIndex(t => t.name === tag.name);
-      if (indexToRemove !== -1) {
-        selectedSubFolder.tags.splice(indexToRemove, 1); // Remove the tag at the found index
-
-        // Update the state with the modified tags array
-        setSelectedSubFolder(selectedSubFolder);
-        unusedTags.push(tag);
-        setUnusedTags(unusedTags);
-      }
-
-      setAllTags((prevTags) => prevTags.filter(t => t.name !== tag.name));
-      refreshTags(selectedSubFolder.id);
-    }
-  }
-
-  // New function to handle tag clicks from unusedTags
-  const handleTagClick = async (tagName) => {
-    await addTag(tagName)
+    if (!selectedCourse) return;
+    await removeTagFromFolder(selectedCourse.id, tag.name);
+    const updatedCourse = { ...selectedCourse, tags: selectedCourse.tags.filter(t => t.name !== tag.name) };
+    setSelectedCourse(updatedCourse);
+    setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+    setUnusedTags(prev => [...prev, tag]);
+    refreshTags(selectedCourse.id);
   };
 
-  const handleTagRemoveClick = async (tag) => {
-    await removeTag(tag);
-  };
-
-  const handleDeleteUnmappedTags = async () => {
-    try {
-      await deleteUnmappedTags();
-      loadTags();
-      refreshTags(selectedSubFolder?.id)
-    } catch (error) {
-      alert('Failed to delete unmapped tags.');
-    }
+  const handleRemoveMainFolder = async (mf) => {
+    await removeMainFolder(mf.id);
+    setConfirmRemove(null);
+    setSelectedCourse(null);
+    await loadData();
+    onFolderRemoved?.();
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-opacity-70 bg-primarydark z-10 py-24">
-      <div className="bg-primary lg:w-2/3 border border-colorborder h-full relative md:w-5/6 sm:mx-4 w-full mx-2">
-        <button
-          onClick={onClose}
-          className="absolute top-3.5 right-4 text-xl hover:text-red-400"
-        >
+      <div className="bg-primary lg:w-2/3 border border-colorborder h-full relative md:w-5/6 sm:mx-4 w-full mx-2 flex flex-col">
+        <button onClick={onClose} className="absolute top-3.5 right-4 text-xl hover:text-red-400">
           &times;
         </button>
-        <div className="text-xl font-semibold w-full h-p10 flex items-center px-4 border-b border-colorborder min-h-14">
-          <img
-            src={folderIcon}
-            alt="Settings"
-            className="w-6 h-6 mr-4" // Add margin to the right of the icon
-          />
+
+        {/* Header */}
+        <div className="text-xl font-semibold w-full flex items-center px-4 border-b border-colorborder min-h-14 shrink-0">
+          <img src={folderIcon} alt="Folder Manager" className="w-6 h-6 mr-4" />
           Folder Manager
         </div>
-        <div className="h-p90 flex">
-          <ul className="flex flex-col w-2/5 px-3 py-1 pb-8 mt-3 mb-3 overflow-y-scroll">
-            {folders.map((folder, index) => (
-              <li key={index}>
-                <div
-                  onClick={() => handleSelectFolder(folder)}
-                  className={`flex items-start hover:cursor-pointer transform duration-200 ease-in-out hover:bg-colorsecondary py-2 rounded border-l-4 ${
-                    expandedFolder === folder && selectedSubFolder === null
-                      ? "border-l-gradientEnd rounded-l-none bg-colorsecondary"
-                      : "border-l-transparent"
-                  }`}
-                >
-                  <img
-                    src={downImg}
-                    alt="arrow"
-                    className={`w-5 pt-0.5 pr-0.5 mr-2 ml-2 transition-transform duration-200 ${
-                      expandedFolder === folder ? "rotate-30" : "-rotate-90"
-                    }`}
-                  />
-                  <img
-                    src={folderImg}
-                    alt="Folder"
-                    className="w-5 pt-0.5 pr-0.5 mr-2"
-                  />
-                  <div className="text-wrap break-all">
-                    {getLastFolderName(folder)}
-                  </div>
-                </div>
-                {expandedFolder === folder && subFolders.length > 0 && (
-                  <ul>
-                    {subFolders.map((subFolder, subIndex) => (
-                      <li
-                        key={subIndex} // Use subFolder.id as the key
-                        className={`flex items-center py-2 pl-11 pr-2 mt-1 rounded border-l-4 hover:cursor-pointer hover:bg-colorsecondary ${
-                          selectedSubFolder === subFolder
-                            ? "border-l-gradientEnd rounded-l-none bg-colorsecondary"
-                            : "border-l-transparent"
-                        }`}
-                        onClick={() => handleSelectSubFolder(subFolder)}
-                      >
-                        <img
-                          src={folderImg}
-                          alt="Subfolder"
-                          className="w-4 mr-3"
-                        />
-                        {subFolder.name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-          <div className="w-3/4 p-4">
-            {selectedSubFolder ? (
-              <div>
-                <h2 className="text-xl font-semibold mb-2">
-                  {selectedSubFolder.name}
-                </h2>
-                <p className="text-sm font-mono">{selectedSubFolder.path}</p>
 
-                <div className="flex mt-5 items-center">
-                  <div className="mr-2 font-semibold text-gradientStart">
-                    🔖{" "}
+        {/* Body */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* Left panel: course list */}
+          <div className="w-2/5 border-r border-colorborder flex flex-col overflow-hidden">
+            <div className="px-4 py-2.5 text-xs font-semibold text-colortextsecondary uppercase tracking-wider border-b border-colorborder shrink-0">
+              Courses
+            </div>
+            <ul className="overflow-y-auto flex-1 py-1">
+              {courses.length === 0 && (
+                <li className="px-4 py-3 text-sm text-colortextsecondary">No courses found.</li>
+              )}
+              {courses.map((course) => (
+                <li key={course.id}>
+                  <div
+                    onClick={() => handleSelectCourse(course)}
+                    className={`flex items-center px-4 py-2.5 cursor-pointer hover:bg-colorsecondary border-l-4 transition-colors duration-150 ${
+                      selectedCourse?.id === course.id
+                        ? "border-l-gradientEnd bg-colorsecondary"
+                        : "border-l-transparent"
+                    }`}
+                  >
+                    <img src={folderImg} alt="Folder" className="w-4 h-4 mr-2.5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{course.name}</div>
+                      <div className="text-xs text-colortextsecondary truncate font-mono">{course.path}</div>
+                    </div>
                   </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Main folders section */}
+            <div className="border-t border-colorborder shrink-0">
+              <div className="px-4 py-2.5 text-xs font-semibold text-colortextsecondary uppercase tracking-wider border-b border-colorborder">
+                Main Folders
+              </div>
+              <ul className="py-1 max-h-36 overflow-y-auto">
+                {mainFolders.map((mf) => (
+                  <li key={mf.id} className="flex items-center justify-between px-4 py-2 hover:bg-colorsecondary">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{mf.name}</div>
+                      <div className="text-xs text-colortextsecondary truncate font-mono">{mf.path}</div>
+                    </div>
+                    <button
+                      onClick={() => setConfirmRemove({ item: mf })}
+                      className="ml-2 shrink-0 text-colortextsecondary hover:text-red-400 transition-colors duration-150 p-1"
+                      title="Remove main folder"
+                    >
+                      <img src={trashIcon} alt="Remove" className="w-4 h-4 opacity-70 hover:opacity-100" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Right panel: tag management */}
+          <div className="flex-1 p-5 overflow-y-auto">
+            {selectedCourse ? (
+              <div>
+                <h2 className="text-lg font-semibold mb-0.5">{selectedCourse.name}</h2>
+                <p className="text-xs font-mono text-colortextsecondary mb-5">{selectedCourse.path}</p>
+
+                {/* Active tags */}
+                <div className="flex items-start mb-5">
+                  <div className="mr-2 font-semibold text-gradientStart mt-0.5">🔖</div>
                   <div className="flex flex-wrap gap-2 min-h-8">
-                    {selectedSubFolder.tags.length > 0 ? (
-                      selectedSubFolder.tags.map((tag, innerIndex) => (
+                    {selectedCourse.tags.length > 0 ? (
+                      selectedCourse.tags.map((tag, i) => (
                         <span
-                          key={innerIndex}
+                          key={i}
                           className="hover:cursor-pointer hover:scale-105 transform ease-in-out duration-200"
-                          onClick={() => handleTagRemoveClick(tag)}
+                          onClick={() => removeTag(tag)}
                         >
                           <Tag text={tag.name} color={tag.color} />
                         </span>
                       ))
                     ) : (
                       <p className="flex items-center font-medium text-colortextsecondary text-sm">
-                        No tags, add some below
+                        No tags — add some below
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div className="relative flex items-center w-2/6 mt-6 mb-3">
+                {/* Add tag input */}
+                <div className="relative flex items-center w-52 mb-3">
                   <form onSubmit={handleAddTag} className="w-full">
                     <input
                       type="text"
                       value={newTag}
                       onChange={(e) => setNewTag(e.target.value)}
-                      className="w-full py-1.5 bg-primarydark sm:text-sm sm:leading-6 border-colorborder border px-2 pr-10 mb-4 rounded-sm"
+                      className="w-full py-1.5 bg-primarydark text-sm border-colorborder border px-2 pr-10 rounded-sm"
                       placeholder="# add a tag"
                     />
                     <button
@@ -315,39 +221,63 @@ const TagManager = ({ isOpen, onClose, refreshTags }) => {
                   </form>
                 </div>
 
+                {/* Unused tags (click to add) */}
                 {unusedTags.length > 0 && (
-                  <div className="mb-2.5 font-medium text-colortextsecondary text-sm">
-                    Click these to tag folder directly
-                  </div>
+                  <>
+                    <div className="mb-2 font-medium text-colortextsecondary text-xs uppercase tracking-wide">
+                      Click to add
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {unusedTags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="hover:cursor-pointer hover:scale-105 transform ease-in-out duration-200"
+                          onClick={() => addTag(tag.name)}
+                        >
+                          <Tag text={tag.name} color={tag.color} />
+                        </span>
+                      ))}
+                    </div>
+                  </>
                 )}
-
-                <div className="flex flex-wrap gap-2 mb-6 mt-4">
-                  {unusedTags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="hover:cursor-pointer hover:scale-105 transform ease-in-out duration-200"
-                      onClick={() => handleTagClick(tag.name)}
-                    >
-                      <Tag key={tag.id} text={tag.name} color={tag.color} />
-                    </span>
-                  ))}
-                </div>
               </div>
             ) : (
-              <p className="text-gray-500">
-                Select a subfolder to see its details.
-              </p>
+              <div className="flex flex-col items-center justify-center h-full text-colortextsecondary text-sm">
+                <img src={folderImg} alt="Select a course" className="w-12 h-12 mb-3 opacity-30" />
+                <p>Select a course to manage its tags</p>
+              </div>
             )}
           </div>
         </div>
-        <div className="mt-4 absolute bottom-5 right-5">
-          <button
-            onClick={handleDeleteUnmappedTags}
-            className="hover:text-red-500 text-colortextsecondary text-sm font-medium hover:scale-105 transform ease-in-out duration-200"
-          >
-            🗑️ Delete Unmapped Tags❗
-          </button>
-        </div>
+
+        {/* Confirm remove main folder dialog */}
+        {confirmRemove && (
+          <div className="absolute inset-0 flex items-center justify-center bg-primarydark bg-opacity-80 z-20">
+            <div className="bg-primary border border-colorborder rounded-sm p-6 max-w-sm w-full mx-4 shadow-lg">
+              <p className="text-sm font-medium mb-1">Remove this main folder and all its courses?</p>
+              <p className="text-xs text-colortextsecondary font-mono mb-3 break-all">
+                {confirmRemove.item.path}
+              </p>
+              <p className="text-xs text-red-400 mb-5">
+              All courses inside this folder will be removed from the tracker.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setConfirmRemove(null)}
+                  className="px-4 py-1.5 text-sm border border-colorborder rounded-sm hover:bg-colorsecondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRemoveMainFolder(confirmRemove.item)}
+                  className="px-4 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

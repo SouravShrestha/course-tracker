@@ -18,6 +18,10 @@ export const addMainFolder = async (path) => {
 export const removeMainFolder = (id) =>
   fetch(`${BASE}/mainfolders/${id}`, { method: 'DELETE' }).then(r => r.json());
 
+export const removeFolder = (id) =>
+  fetch(`${BASE}/folders/${id}`, { method: 'DELETE' }).then(r => r.json());
+
+
 // ─── Scanning ─────────────────────────────────────────────────────────────────
 export const scanMainFolder = () =>
   fetch(`${BASE}/mainfolders/scan`, { method: 'POST' }).then(r => r.json());
