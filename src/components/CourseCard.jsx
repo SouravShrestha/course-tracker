@@ -8,6 +8,8 @@ const progressIcon = "/images/progress.png";
 import { calculateVideoStats } from "../utils/courseUtils";
 import TextCard from "./TextCard";
 import Tag from "./Tag";
+import { formatTitle } from "../utils/formatTitle";
+
 
 const CourseCard = ({ course, courseColor }) => {
   const router = useRouter();
@@ -28,7 +30,7 @@ const CourseCard = ({ course, courseColor }) => {
       <div className="p-4 border border-colorborder rounded-md rounded-t-none border-t-0 flex-grow">
         <div className="w-full relative">
           <h3 className="text-lg mb-0 font-semibold max-w-4/5 overflow-x-hidden">
-            {course.name}
+            {formatTitle(course.name)}
           </h3>
           <img
             src={

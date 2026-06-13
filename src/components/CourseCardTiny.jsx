@@ -2,6 +2,8 @@
 import React from "react";
 import { useRouter } from 'next/navigation';
 import TextCardTiny from "./TextCardTiny";
+import { formatTitle } from "../utils/formatTitle";
+
 
 const CourseCardTiny = ({ course, courseColor }) => {
   const router = useRouter();
@@ -68,12 +70,12 @@ const CourseCardTiny = ({ course, courseColor }) => {
       <div className="border border-colorborder rounded-md rounded-l-none border-l-0 flex-col flex-grow justify-between h-20 flex py-2 pl-3 pr-3 w-0">
         <div className="font-semibold truncate">
           {course.last_played_video?.name
-            ? course.last_played_video.name.replace(/\.\w+$/, "")
+            ? formatTitle(course.last_played_video.name)
             : "Never Played"}
         </div>
         <div className="flex justify-between items-baseline">
           <span className="text-sm text-colortextsecondary -mt-1.5 max-w-3/5 truncate">
-            {course.name}
+            {formatTitle(course.name)}
           </span>
           <span className="text-xxs text-colortextsecondary -mt-1.5 truncate">
             🏁{" "}

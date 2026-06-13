@@ -4,9 +4,9 @@
   "description": "Track your video course progress",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/serve.js dev",
     "build": "next build",
-    "start": "next start"
+    "start": "node scripts/serve.js start"
   },
   "dependencies": {
     "better-sqlite3": "^11.9.1",

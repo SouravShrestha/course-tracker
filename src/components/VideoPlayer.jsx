@@ -7,6 +7,8 @@ const pointIcon = "/images/point.png";
 import NoteCard from "./NoteCard";
 import AddNote from "./AddNote";
 import { updateVideoProgressB, getNotesB } from "../utils/api";
+import { formatTitle } from "../utils/formatTitle";
+
 
 const VideoPlayer = ({
   videoPath,
@@ -14,6 +16,8 @@ const VideoPlayer = ({
   cUpdateVideoProgress,
   nextVideo,
   prevVideo,
+  nextVideoNum,
+  prevVideoNum,
   onVideoChange,
   isManualChange,
   setIsManualChange,
@@ -370,7 +374,7 @@ const VideoPlayer = ({
                   className="inline-block w-8 h-8 transform scale-x-[-1]"
                 />
                 <span className="mt-3 font-medium text-sm">
-                  {prevVideo.name.replace(/\.\w+$/, "")}
+                  {String(prevVideoNum).padStart(2, '0')}. {formatTitle(prevVideo.name)}
                 </span>
               </button>
             )}
@@ -389,7 +393,7 @@ const VideoPlayer = ({
                   className="inline-block w-8 h-8"
                 />
                 <span className="mt-3 font-medium text-sm">
-                  {nextVideo.name.replace(/\.\w+$/, "")}
+                  {String(nextVideoNum).padStart(2, '0')}. {formatTitle(nextVideo.name)}
                 </span>
               </button>
             )}

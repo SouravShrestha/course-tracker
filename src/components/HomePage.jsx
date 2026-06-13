@@ -204,8 +204,8 @@ const HomePage = () => {
     }
   };
 
-  const refreshTags = (folderId) => {
-    updateTags(folderId);
+  const refreshTags = async (folderId) => {
+    await updateTags(folderId);
   };
 
   const refreshCourseTags = async (folderId) => {

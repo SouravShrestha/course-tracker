@@ -1,6 +1,7 @@
 'use client';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { fetchTags, addTagToFolder, removeTagFromFolder, removeMainFolder, fetchMainFolders } from "../utils/api";
+const purgeUnusedTags = () => fetch('/api/tags', { method: 'DELETE' }).then(r => r.json());
 const folderImg = "/images/folder.png";
 import Tag from "./Tag";
 import { getRandomColorPair } from "../utils/colorUtils";
@@ -12,9 +13,13 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
   const [mainFolders, setMainFolders] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [newTag, setNewTag] = useState("");
-  const [unusedTags, setUnusedTags] = useState([]);
   const [allTags, setAllTags] = useState([]);
-  const [confirmRemove, setConfirmRemove] = useState(null); // { item: mainFolder }
+  const [confirmRemove, setConfirmRemove] = useState(null);
+
+  const unusedTags = useMemo(() => {
+    if (!selectedCourse) return [];
+    return allTags.filter(t => !selectedCourse.tags.some(ct => ct.name === t.name));
+  }, [allTags, selectedCourse]);
 
   useEffect(() => {
     if (isOpen) {
@@ -60,8 +65,6 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
 
   const handleSelectCourse = (course) => {
     setSelectedCourse(course);
-    const unused = allTags.filter(t => !course.tags.some(ct => ct.name === t.name));
-    setUnusedTags(unused);
   };
 
   const handleAddTag = async (e) => {
@@ -71,16 +74,15 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
 
   const addTag = async (tagName) => {
     if (!tagName.trim() || !selectedCourse) return;
+    if (selectedCourse.tags.some(t => t.name === tagName.trim().toLowerCase())) return;
     const updatedTag = await addTagToFolder(selectedCourse.id, tagName.trim().toLowerCase());
     const tagWithColor = { ...updatedTag, color: getRandomColorPair() };
-
     const updatedCourse = { ...selectedCourse, tags: [...selectedCourse.tags, tagWithColor] };
     setSelectedCourse(updatedCourse);
     setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
     setAllTags(prev => prev.some(t => t.name === tagWithColor.name) ? prev : [...prev, tagWithColor]);
-    setUnusedTags(prev => prev.filter(t => t.name !== tagWithColor.name));
     setNewTag("");
-    refreshTags(selectedCourse.id);
+    await refreshTags(selectedCourse.id);
   };
 
   const removeTag = async (tag) => {
@@ -89,8 +91,7 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
     const updatedCourse = { ...selectedCourse, tags: selectedCourse.tags.filter(t => t.name !== tag.name) };
     setSelectedCourse(updatedCourse);
     setCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
-    setUnusedTags(prev => [...prev, tag]);
-    refreshTags(selectedCourse.id);
+    await refreshTags(selectedCourse.id);
   };
 
   const handleRemoveMainFolder = async (mf) => {
@@ -99,6 +100,11 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
     setSelectedCourse(null);
     await loadData();
     onFolderRemoved?.();
+  };
+
+  const handlePurgeUnusedTags = async () => {
+    await purgeUnusedTags();
+    await loadData();
   };
 
   if (!isOpen) return null;
@@ -111,9 +117,18 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
         </button>
 
         {/* Header */}
-        <div className="text-xl font-semibold w-full flex items-center px-4 border-b border-colorborder min-h-14 shrink-0">
-          <img src={folderIcon} alt="Folder Manager" className="w-6 h-6 mr-4" />
-          Folder Manager
+        <div className="text-xl font-semibold w-full flex items-center justify-between px-4 border-b border-colorborder min-h-14 shrink-0">
+          <div className="flex items-center">
+            <img src={folderIcon} alt="Folder Manager" className="w-6 h-6 mr-4" />
+            Folder Manager
+          </div>
+          <button
+            onClick={handlePurgeUnusedTags}
+            className="text-xs font-normal text-colortextsecondary hover:text-red-400 border border-colorborder px-3 py-1 rounded-sm hover:border-red-400 transition-colors duration-150 mr-8"
+            title="Delete tags not assigned to any course"
+          >
+            Clean unused tags
+          </button>
         </div>
 
         {/* Body */}
@@ -203,7 +218,7 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
                 </div>
 
                 {/* Add tag input */}
-                <div className="relative flex items-center w-52 mb-3">
+                <div className="relative flex items-center w-52 mb-5">
                   <form onSubmit={handleAddTag} className="w-full">
                     <input
                       type="text"
@@ -214,7 +229,7 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
                     />
                     <button
                       type="submit"
-                      className="absolute right-2 text-white rounded-md hover:bg-gradient-to-r hover:from-gradientStart hover:to-gradientEnd px-2 top-2"
+                      className="absolute right-1.5 text-white rounded-md hover:bg-gradient-to-r hover:from-gradientStart hover:to-gradientEnd px-2 top-1.5"
                     >
                       ⏎
                     </button>
@@ -224,7 +239,7 @@ const TagManager = ({ isOpen, onClose, refreshTags, onFolderRemoved }) => {
                 {/* Unused tags (click to add) */}
                 {unusedTags.length > 0 && (
                   <>
-                    <div className="mb-2 font-medium text-colortextsecondary text-xs uppercase tracking-wide">
+                    <div className="mb-1 font-medium text-colortextsecondary text-[9px] uppercase tracking-wide">
                       Click to add
                     </div>
                     <div className="flex flex-wrap gap-2">

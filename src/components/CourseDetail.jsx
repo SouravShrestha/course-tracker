@@ -57,6 +57,8 @@ const CourseDetail = () => {
   const nextVideo =
     currentIndex < videoList.length - 1 ? videoList[currentIndex + 1] : null;
   const prevVideo = currentIndex > 0 ? videoList[currentIndex - 1] : null;
+  const nextVideoNum = nextVideo ? currentIndex + 2 : null;
+  const prevVideoNum = prevVideo ? currentIndex : null;
 
   const [dropdownVisible, setDropdownVisible] = useState(false); // State to track dropdown visibility
   const handleDropdownVisibilityChange = (isVisible) => {
@@ -86,9 +88,11 @@ const CourseDetail = () => {
           cUpdateVideoProgress={updateVideoProgress}
           nextVideo={nextVideo}
           prevVideo={prevVideo}
+          nextVideoNum={nextVideoNum}
+          prevVideoNum={prevVideoNum}
           onVideoChange={handleVideoClick}
           isManualChange={isManualChange}
-          setIsManualChange={setIsManualChange} 
+          setIsManualChange={setIsManualChange}
         />
       </div>
     </div>
